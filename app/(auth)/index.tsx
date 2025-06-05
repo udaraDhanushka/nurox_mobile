@@ -1,6 +1,10 @@
 import React from 'react';
-import WelcomeScreen from '@/components/screens/WelcomeScreen';
+import {WelcomeScreen} from '@/components/screens/WelcomeScreen';
 
 export default function AuthIndexScreen() {
-  return <WelcomeScreen />;
+  const handleGetStarted = () => {
+    console.log('User clicked Get Started');
+  };
+
+  return <WelcomeScreen onGetStarted={handleGetStarted} />;
 }

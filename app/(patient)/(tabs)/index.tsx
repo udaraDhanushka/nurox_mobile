@@ -9,6 +9,25 @@ import { useMedicalStore } from '@/store/medicalStore';
 import { useAuthStore } from '@/store/authStore';
 import { useTranslation } from '@/hooks/useTranslation';
 
+const upcomingAppointments = [
+    {
+        id: '1',
+        doctorName: 'Dr. Sarah Wilson',
+        specialty: 'Cardiologist',
+        date: 'Today',
+        time: '14:30',
+        doctorImage: 'https://example.com/doctor1.jpg',
+    },
+    {
+        id: '2',
+        doctorName: 'Dr. Michael Chen',
+        specialty: 'Dermatologist',
+        date: 'Tomorrow',
+        time: '10:00',
+        doctorImage: 'https://example.com/doctor2.jpg',
+    },
+];
+
 export default function PatientHomeScreen() {
     const router = useRouter();
     const { user } = useAuthStore();
@@ -51,7 +70,7 @@ export default function PatientHomeScreen() {
                     </View>
                     <TouchableOpacity
                         style={styles.profileButton}
-                        onPress={() => router.push('/(patient)/profile')}
+                        onPress={() => router.push('/profile')}
                     >
                         {user?.profileImage ? (
                             <Image
@@ -113,7 +132,7 @@ export default function PatientHomeScreen() {
 
                     <TouchableOpacity
                         style={styles.quickActionButton}
-                        onPress={() => router.push('/(patient)/health-tips')}
+                        onPress={() => router.push('/health-tips')}
                     >
                         <View style={[styles.iconContainer, { backgroundColor: 'rgba(156, 39, 176, 0.1)' }]}>
                             <HandHeart size={24} color="#9C27B0" />

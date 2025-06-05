@@ -11,16 +11,16 @@ import { LanguageSelector } from '@/components/ui/LanguageSelector';
 import { useTranslation } from '@/hooks/useTranslation';
 
 export default function ProfileScreen() {
-  const router = useRouter();
-  const { user, logout, updateUser } = useAuthStore();
-  const [isDarkMode, setIsDarkMode] = useState(false);
+    const router = useRouter();
+    const { user, logout, updateUser } = useAuthStore();
+    const [isDarkMode, setIsDarkMode] = useState(false);
   const { t } = useTranslation();
   const [showLanguageModal, setShowLanguageModal] = useState(false);
 
-  const menuItems = [
-    {
+    const menuItems = [
+        {
       title: t('personalInformation'),
-      icon: <User size={24} color={isDarkMode ? COLORS.white : COLORS.primary} />,
+            icon: <User size={24} color={isDarkMode ? COLORS.white : COLORS.primary} />,
       onPress: () => router.push('/(patient)/profile/personal'),
     },
     {
@@ -47,35 +47,35 @@ export default function ProfileScreen() {
       title: t('helpSupport'),
       icon: <FileText size={24} color={isDarkMode ? COLORS.white : COLORS.primary} />,
       onPress: () => router.push('/(patient)/profile/support'),
-    },
-  ];
+        },
+    ];
 
-  const handleLogout = () => {
-    logout();
-    router.replace('/(auth)');
-  };
+    const handleLogout = () => {
+        logout();
+        router.replace('/(auth)');
+    };
 
-  const handleImageUpload = async () => {
+    const handleImageUpload = async () => {
     if (!user) {
       Alert.alert('Error', 'User not found. Please log in again.');
       return;
     }
 
-    try {
-      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permissionResult.granted) {
-        Alert.alert('Permission Required', 'Please allow access to your photo library to upload a profile picture.');
-        return;
-      }
+        try {
+            const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (!permissionResult.granted) {
+                Alert.alert('Permission Required', 'Please allow access to your photo library to upload a profile picture.');
+                return;
+            }
 
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.8,
+            });
 
-      if (!result.canceled && result.assets[0].uri) {
+            if (!result.canceled && result.assets[0].uri) {
         updateUser({ 
           id: user.id,
           email: user.email,
@@ -84,33 +84,33 @@ export default function ProfileScreen() {
           role: user.role,
           profileImage: result.assets[0].uri 
         });
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to upload image. Please try again.');
-      console.error('Image upload error:', error);
-    }
-  };
+            }
+        } catch (error) {
+            Alert.alert('Error', 'Failed to upload image. Please try again.');
+            console.error('Image upload error:', error);
+        }
+    };
 
-  const handleTakePhoto = async () => {
+    const handleTakePhoto = async () => {
     if (!user) {
       Alert.alert('Error', 'User not found. Please log in again.');
       return;
     }
 
-    try {
-      const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
-      if (!permissionResult.granted) {
-        Alert.alert('Permission Required', 'Please allow access to your camera to take a profile picture.');
-        return;
-      }
+        try {
+            const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+            if (!permissionResult.granted) {
+                Alert.alert('Permission Required', 'Please allow access to your camera to take a profile picture.');
+                return;
+            }
 
-      const result = await ImagePicker.launchCameraAsync({
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
+            const result = await ImagePicker.launchCameraAsync({
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.8,
+            });
 
-      if (!result.canceled && result.assets[0].uri) {
+            if (!result.canceled && result.assets[0].uri) {
         updateUser({ 
           id: user.id,
           email: user.email,
@@ -119,117 +119,117 @@ export default function ProfileScreen() {
           role: user.role,
           profileImage: result.assets[0].uri 
         });
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to take photo. Please try again.');
-      console.error('Camera error:', error);
-    }
-  };
+            }
+        } catch (error) {
+            Alert.alert('Error', 'Failed to take photo. Please try again.');
+            console.error('Camera error:', error);
+        }
+    };
 
-  const toggleDarkMode = () => {
-    setIsDarkMode(!isDarkMode);
-  };
+    const toggleDarkMode = () => {
+        setIsDarkMode(!isDarkMode);
+    };
 
-  return (
-    <SafeAreaView style={[styles.container, isDarkMode && styles.containerDark]}>
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+    return (
+        <SafeAreaView style={[styles.container, isDarkMode && styles.containerDark]}>
+            <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* 1. Profile Image Section */}
-        <View style={styles.profileHeader}>
-          <View style={styles.avatarContainer}>
-            <TouchableOpacity
-              style={styles.avatarWrapper}
-              onPress={() => {
-                Alert.alert(
-                  'Update Profile Picture',
-                  'Choose a method to update your profile picture',
-                  [
-                    { text: 'Take Photo', onPress: handleTakePhoto },
-                    { text: 'Choose from Library', onPress: handleImageUpload },
-                    { text: 'Cancel', style: 'cancel' },
-                  ]
-                );
-              }}
-            >
-              {user?.profileImage ? (
-                <Image
-                  source={{ uri: user.profileImage }}
-                  style={styles.avatar}
-                />
-              ) : (
-                <View style={[styles.avatarPlaceholder, isDarkMode && styles.avatarPlaceholderDark]}>
-                  <User size={40} color={isDarkMode ? COLORS.white : COLORS.primary} />
+                <View style={styles.profileHeader}>
+                    <View style={styles.avatarContainer}>
+                        <TouchableOpacity
+                            style={styles.avatarWrapper}
+                            onPress={() => {
+                                Alert.alert(
+                                    'Update Profile Picture',
+                                    'Choose a method to update your profile picture',
+                                    [
+                                        { text: 'Take Photo', onPress: handleTakePhoto },
+                                        { text: 'Choose from Library', onPress: handleImageUpload },
+                                        { text: 'Cancel', style: 'cancel' },
+                                    ]
+                                );
+                            }}
+                        >
+                            {user?.profileImage ? (
+                                <Image
+                                    source={{ uri: user.profileImage }}
+                                    style={styles.avatar}
+                                />
+                            ) : (
+                                <View style={[styles.avatarPlaceholder, isDarkMode && styles.avatarPlaceholderDark]}>
+                                    <User size={40} color={isDarkMode ? COLORS.white : COLORS.primary} />
+                                </View>
+                            )}
+                            <View style={styles.cameraButton}>
+                                <Camera size={16} color={COLORS.white} />
+                            </View>
+                        </TouchableOpacity>
+                    </View>
+                    <Text style={[styles.name, isDarkMode && styles.textDark]}>{user?.firstName} {user?.lastName}</Text>
+                    <Text style={[styles.email, isDarkMode && styles.textSecondaryDark]}>{user?.email}</Text>
+                    <View style={styles.badge}>
+                        <Text style={styles.badgeText}>Patient</Text>
+                    </View>
                 </View>
-              )}
-              <View style={styles.cameraButton}>
-                <Camera size={16} color={COLORS.white} />
-              </View>
-            </TouchableOpacity>
-          </View>
-          <Text style={[styles.name, isDarkMode && styles.textDark]}>{user?.firstName} {user?.lastName}</Text>
-          <Text style={[styles.email, isDarkMode && styles.textSecondaryDark]}>{user?.email}</Text>
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>Patient</Text>
-          </View>
-        </View>
 
         {/* 2. Dark/Light Toggle */}
-        <TouchableOpacity
-          style={[styles.darkModeToggle, isDarkMode && styles.darkModeToggleDark]}
-          onPress={toggleDarkMode}
-        >
-          <View style={styles.darkModeIcon}>
-            {isDarkMode ? (
-              <Moon size={24} color={COLORS.white} />
-            ) : (
-              <Sun size={24} color={COLORS.primary} />
-            )}
-          </View>
-          <Text style={[styles.darkModeText, isDarkMode && styles.textDark]}>
+                <TouchableOpacity
+                    style={[styles.darkModeToggle, isDarkMode && styles.darkModeToggleDark]}
+                    onPress={toggleDarkMode}
+                >
+                    <View style={styles.darkModeIcon}>
+                        {isDarkMode ? (
+                            <Moon size={24} color={COLORS.white} />
+                        ) : (
+                            <Sun size={24} color={COLORS.primary} />
+                        )}
+                    </View>
+                    <Text style={[styles.darkModeText, isDarkMode && styles.textDark]}>
             {isDarkMode ? t('darkMode') : t('lightMode')}
-          </Text>
-          <Switch
-            value={isDarkMode}
-            onValueChange={toggleDarkMode}
-            trackColor={{ false: COLORS.border, true: COLORS.primary }}
-            thumbColor={COLORS.white}
-          />
-        </TouchableOpacity>
+                    </Text>
+                    <Switch
+                        value={isDarkMode}
+                        onValueChange={toggleDarkMode}
+                        trackColor={{ false: COLORS.border, true: COLORS.primary }}
+                        thumbColor={COLORS.white}
+                    />
+                </TouchableOpacity>
 
         {/* 3-7. Menu Items */}
-        <View style={[styles.menuContainer, isDarkMode && styles.menuContainerDark]}>
-          {menuItems.map((item, index) => (
-            <TouchableOpacity
-              key={item.title}
-              style={[
-                styles.menuItem,
-                isDarkMode && styles.menuItemDark,
-                index === menuItems.length - 1 && styles.menuItemLast,
-              ]}
-              onPress={item.onPress}
-            >
-              <View style={[styles.menuIcon, isDarkMode && styles.menuIconDark]}>
-                {item.icon}
-              </View>
-              <Text style={[styles.menuTitle, isDarkMode && styles.textDark]}>
-                {item.title}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+                <View style={[styles.menuContainer, isDarkMode && styles.menuContainerDark]}>
+                    {menuItems.map((item, index) => (
+                        <TouchableOpacity
+                            key={item.title}
+                            style={[
+                                styles.menuItem,
+                                isDarkMode && styles.menuItemDark,
+                                index === menuItems.length - 1 && styles.menuItemLast,
+                            ]}
+                            onPress={item.onPress}
+                        >
+                            <View style={[styles.menuIcon, isDarkMode && styles.menuIconDark]}>
+                                {item.icon}
+                            </View>
+                            <Text style={[styles.menuTitle, isDarkMode && styles.textDark]}>
+                                {item.title}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
 
         {/* 8. App Version */}
-        <Text style={[styles.version, isDarkMode && styles.textSecondaryDark]}>
+                <Text style={[styles.version, isDarkMode && styles.textSecondaryDark]}>
           {t('version')} {Constants.expoConfig?.version || '1.0.0'}
-        </Text>
+                </Text>
 
         {/* 9. Logout Button */}
-        <TouchableOpacity
-          style={[styles.logoutButton, isDarkMode && styles.logoutButtonDark]}
-          onPress={handleLogout}
-        >
-          <LogOut size={24} color={COLORS.error} />
+                <TouchableOpacity
+                    style={[styles.logoutButton, isDarkMode && styles.logoutButtonDark]}
+                    onPress={handleLogout}
+                >
+                    <LogOut size={24} color={COLORS.error} />
           <Text style={styles.logoutText}>{t('logout')}</Text>
-        </TouchableOpacity>
+                </TouchableOpacity>
 
         {/* Language Selector Modal */}
         <LanguageSelector 
@@ -237,179 +237,179 @@ export default function ProfileScreen() {
           isVisible={showLanguageModal}
           onClose={() => setShowLanguageModal(false)}
         />
-      </ScrollView>
-    </SafeAreaView>
-  );
+            </ScrollView>
+        </SafeAreaView>
+    );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  containerDark: {
-    backgroundColor: '#1a1a1a',
-  },
-  content: {
-    flex: 1,
-    padding: 16,
-  },
-  profileHeader: {
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  avatarContainer: {
-    marginBottom: 16,
-  },
-  avatarWrapper: {
-    position: 'relative',
-  },
-  avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-  },
-  avatarPlaceholder: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: COLORS.white,
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...SHADOWS.medium,
-  },
-  avatarPlaceholderDark: {
-    backgroundColor: '#2a2a2a',
-  },
-  cameraButton: {
-    position: 'absolute',
-    right: 0,
-    bottom: 0,
-    backgroundColor: COLORS.primary,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...SHADOWS.small,
-  },
-  name: {
-    fontSize: SIZES.xl,
-    fontWeight: 'bold',
-    color: COLORS.textPrimary,
-    marginBottom: 4,
-  },
-  email: {
-    fontSize: SIZES.md,
-    color: COLORS.textSecondary,
-    marginBottom: 8,
-  },
-  badge: {
-    backgroundColor: COLORS.transparentPrimary,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  badgeText: {
-    color: COLORS.primary,
-    fontSize: SIZES.sm,
-    fontWeight: '500',
-  },
-  darkModeToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.white,
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 16,
-    ...SHADOWS.medium,
-  },
-  darkModeToggleDark: {
-    backgroundColor: '#2a2a2a',
-  },
-  darkModeIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.transparentPrimary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  darkModeText: {
-    flex: 1,
-    fontSize: SIZES.md,
-    color: COLORS.textPrimary,
-    fontWeight: '500',
-  },
-  menuContainer: {
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    ...SHADOWS.medium,
-    marginBottom: 16,
-  },
-  menuContainerDark: {
-    backgroundColor: '#2a2a2a',
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  menuItemDark: {
-    borderBottomColor: '#3a3a3a',
-  },
-  menuItemLast: {
-    borderBottomWidth: 0,
-  },
-  menuIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.transparentPrimary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  menuIconDark: {
-    backgroundColor: '#3a3a3a',
-  },
-  menuTitle: {
-    flex: 1,
-    fontSize: SIZES.md,
-    color: COLORS.textPrimary,
-    fontWeight: '500',
-  },
-  version: {
-    textAlign: 'center',
-    fontSize: SIZES.sm,
-    color: COLORS.textSecondary,
-    marginBottom: 16,
-  },
-  logoutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    ...SHADOWS.medium,
-  },
-  logoutButtonDark: {
-    backgroundColor: '#2a2a2a',
-  },
-  logoutText: {
-    marginLeft: 8,
-    fontSize: SIZES.md,
-    color: COLORS.error,
-    fontWeight: '500',
-  },
-  textDark: {
-    color: COLORS.white,
-  },
-  textSecondaryDark: {
-    color: '#999999',
-  },
+    container: {
+        flex: 1,
+        backgroundColor: COLORS.background,
+    },
+    containerDark: {
+        backgroundColor: '#1a1a1a',
+    },
+    content: {
+        flex: 1,
+        padding: 16,
+    },
+    profileHeader: {
+        alignItems: 'center',
+        marginBottom: 32,
+    },
+    avatarContainer: {
+        marginBottom: 16,
+    },
+    avatarWrapper: {
+        position: 'relative',
+    },
+    avatar: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+    },
+    avatarPlaceholder: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        backgroundColor: COLORS.white,
+        justifyContent: 'center',
+        alignItems: 'center',
+        ...SHADOWS.medium,
+    },
+    avatarPlaceholderDark: {
+        backgroundColor: '#2a2a2a',
+    },
+    cameraButton: {
+        position: 'absolute',
+        right: 0,
+        bottom: 0,
+        backgroundColor: COLORS.primary,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
+        ...SHADOWS.small,
+    },
+    name: {
+        fontSize: SIZES.xl,
+        fontWeight: 'bold',
+        color: COLORS.textPrimary,
+        marginBottom: 4,
+    },
+    email: {
+        fontSize: SIZES.md,
+        color: COLORS.textSecondary,
+        marginBottom: 8,
+    },
+    badge: {
+        backgroundColor: COLORS.transparentPrimary,
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        borderRadius: 12,
+    },
+    badgeText: {
+        color: COLORS.primary,
+        fontSize: SIZES.sm,
+        fontWeight: '500',
+    },
+    darkModeToggle: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: COLORS.white,
+        padding: 16,
+        borderRadius: 12,
+        marginBottom: 16,
+        ...SHADOWS.medium,
+    },
+    darkModeToggleDark: {
+        backgroundColor: '#2a2a2a',
+    },
+    darkModeIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: COLORS.transparentPrimary,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    darkModeText: {
+        flex: 1,
+        fontSize: SIZES.md,
+        color: COLORS.textPrimary,
+        fontWeight: '500',
+    },
+    menuContainer: {
+        backgroundColor: COLORS.white,
+        borderRadius: 12,
+        ...SHADOWS.medium,
+        marginBottom: 16,
+    },
+    menuContainerDark: {
+        backgroundColor: '#2a2a2a',
+    },
+    menuItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
+    },
+    menuItemDark: {
+        borderBottomColor: '#3a3a3a',
+    },
+    menuItemLast: {
+        borderBottomWidth: 0,
+    },
+    menuIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: COLORS.transparentPrimary,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    menuIconDark: {
+        backgroundColor: '#3a3a3a',
+    },
+    menuTitle: {
+        flex: 1,
+        fontSize: SIZES.md,
+        color: COLORS.textPrimary,
+        fontWeight: '500',
+    },
+    version: {
+        textAlign: 'center',
+        fontSize: SIZES.sm,
+        color: COLORS.textSecondary,
+        marginBottom: 16,
+    },
+    logoutButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16,
+        backgroundColor: COLORS.white,
+        borderRadius: 12,
+        ...SHADOWS.medium,
+    },
+    logoutButtonDark: {
+        backgroundColor: '#2a2a2a',
+    },
+    logoutText: {
+        marginLeft: 8,
+        fontSize: SIZES.md,
+        color: COLORS.error,
+        fontWeight: '500',
+    },
+    textDark: {
+        color: COLORS.white,
+    },
+    textSecondaryDark: {
+        color: '#999999',
+    },
 });
