@@ -153,14 +153,14 @@ export const Button: React.FC<ButtonProps> = ({
         >
             <View style={styles.content}>
                 {icon && <View style={styles.iconContainer}>{icon}</View>}
-                {isLoading ? (
-                    <ActivityIndicator
-                        size="small"
-                        color={variant === 'primary' || variant === 'secondary' ? COLORS.white : COLORS.primary}
-                    />
-                ) : (
-                    <Text style={[getTextStyle(), textStyle]}>{title}</Text>
-                )}
+            {isLoading ? (
+                <ActivityIndicator
+                    size="small"
+                    color={variant === 'primary' || variant === 'secondary' ? COLORS.white : COLORS.primary}
+                />
+            ) : (
+                <Text style={[getTextStyle(), textStyle]}>{title}</Text>
+            )}
             </View>
         </TouchableOpacity>
     );
