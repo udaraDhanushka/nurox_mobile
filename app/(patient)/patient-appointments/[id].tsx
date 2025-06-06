@@ -6,6 +6,7 @@ import { Calendar, Clock, MapPin, ArrowLeft, Phone, MessageCircle, X } from 'luc
 import { COLORS, SIZES, SHADOWS } from '@/constants/theme';
 import { Button } from '@/components/Button';
 import { useAppointmentStore } from '@/store/appointmentStore';
+import { Appointment } from '@/types/appointment';
 
 export default function AppointmentDetailsScreen() {
     const router = useRouter();
@@ -132,7 +133,7 @@ export default function AppointmentDetailsScreen() {
                         <Clock size={20} color={COLORS.primary} />
                         <View style={styles.detailContent}>
                             <Text style={styles.detailLabel}>Time</Text>
-                            <Text style={styles.detailValue}>{appointment.time}</Text>
+                            <Text style={styles.detailValue}>{appointment.estimatedTime}</Text>
                         </View>
                     </View>
 
@@ -140,7 +141,7 @@ export default function AppointmentDetailsScreen() {
                         <MapPin size={20} color={COLORS.primary} />
                         <View style={styles.detailContent}>
                             <Text style={styles.detailLabel}>Location</Text>
-                            <Text style={styles.detailValue}>{appointment.location}</Text>
+                            <Text style={styles.detailValue}>{appointment.hospitalAddress}</Text>
                         </View>
                     </View>
 

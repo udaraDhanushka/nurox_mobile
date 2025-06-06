@@ -1,87 +1,240 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Hospital, TokenSlot, AppointmentType } from '../types/appointment';
 
-export type AppointmentStatus = 'confirmed' | 'pending' | 'cancelled';
+export type AppointmentStatus = 'pending' | 'confirmed' | 'cancelled' | 'completed';
 
 export interface Appointment {
-    id: string;
-    doctorName: string;
-    specialty: string;
-    date: string;
-    time: string;
-    location: string;
-    status: AppointmentStatus;
-    notes: string;
-    doctorImage: string;
+  id: string;
+  doctorId: string;
+  doctorName: string;
+  specialty: string;
+  hospitalId: string;
+  hospitalName: string;
+  hospitalAddress: string;
+  date: string;
+  tokenNumber: number;
+  estimatedTime: string;
+  duration: string;
+  status: AppointmentStatus;
+  type: AppointmentType;
+  notes: string;
+  doctorImage: string;
+  rating: number;
+  experience: string;
 }
 
 interface AppointmentState {
-    appointments: Appointment[];
-    addAppointment: (appointment: Appointment) => void;
-    updateAppointment: (id: string, updatedAppointment: Partial<Appointment>) => void;
-    cancelAppointment: (id: string) => void;
-    getAppointmentById: (id: string) => Appointment | undefined;
+  appointments: Appointment[];
+  hospitals: Hospital[];
+  appointmentTypes: AppointmentType[];
+  addAppointment: (appointment: Appointment) => void;
+  updateAppointment: (id: string, updates: Partial<Appointment>) => void;
+  cancelAppointment: (id: string) => void;
+  getAppointmentById: (id: string) => Appointment | undefined;
+  getHospitalsByDoctorId: (doctorId: string) => Hospital[];
+  getTokenAvailability: (doctorId: string, hospitalId: string, date: string) => TokenSlot[];
+  getAppointmentTypes: () => AppointmentType[];
 }
 
-export const useAppointmentStore = create<AppointmentState>()(
-    persist(
-        (set, get) => ({
-            appointments: [
-                {
-                    id: '1',
-                    doctorName: 'Dr. Sarah Johnson',
-                    specialty: 'cardiologist',
-                    date: '2023-11-15',
-                    time: '10:00 AM',
-                    location: 'Heart Care Center, Building A, Room 305',
-                    status: 'confirmed',
-                    notes: 'Bring previous ECG reports and medication list',
-                    doctorImage: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?q=80&w=2070&auto=format&fit=crop'
-                },
-                {
-                    id: '2',
-                    doctorName: 'Dr. Michael Chen',
-                    specialty: 'neurologist',
-                    date: '2023-11-20',
-                    time: '2:30 PM',
-                    location: 'Neurology Associates, Building B, Room 210',
-                    status: 'pending',
-                    notes: 'Follow-up appointment for headache evaluation',
-                    doctorImage: 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?q=80&w=2070&auto=format&fit=crop'
-                },
-                {
-                    id: '3',
-                    doctorName: 'Dr. Emily Rodriguez',
-                    specialty: 'dermatologist',
-                    date: '2023-11-10',
-                    time: '9:15 AM',
-                    location: 'Skin Health Clinic, Suite 150',
-                    status: 'cancelled',
-                    notes: 'Annual skin check',
-                    doctorImage: 'https://images.unsplash.com/photo-1594824476967-48c8b964273f?q=80&w=2787&auto=format&fit=crop'
-                }
-            ],
-            addAppointment: (appointment) => set((state) => ({
-                appointments: [...state.appointments, appointment]
-            })),
-            updateAppointment: (id, updatedAppointment) => set((state) => ({
-                appointments: state.appointments.map((appointment) =>
-                    appointment.id === id ? { ...appointment, ...updatedAppointment } : appointment
-                )
-            })),
-            cancelAppointment: (id) => set((state) => ({
-                appointments: state.appointments.map((appointment) =>
-                    appointment.id === id ? { ...appointment, status: 'cancelled' } : appointment
-                )
-            })),
-            getAppointmentById: (id) => {
-                return get().appointments.find((appointment) => appointment.id === id);
-            }
-        }),
-        {
-            name: 'appointment-storage',
-            storage: createJSONStorage(() => AsyncStorage),
-        }
+// Available appointment types
+const appointmentTypes: AppointmentType[] = [
+  'Consultation',
+  'Follow-up',
+  'Emergency',
+  'Routine Checkup',
+  'Specialist Consultation',
+  'Vaccination',
+  'Lab Test',
+  'Diagnostic',
+  'Surgery Consultation',
+  'Mental Health'
+];
+
+// Mock hospitals data
+const mockHospitals: Hospital[] = [
+  {
+    id: 'h1',
+    name: 'City General Hospital',
+    address: '123 Main St, Downtown',
+    phone: '+1 (555) 123-4567',
+    totalTokens: 30
+  },
+  {
+    id: 'h2',
+    name: 'Medical Center Downtown',
+    address: '456 Oak Ave, Midtown',
+    phone: '+1 (555) 234-5678',
+    totalTokens: 25
+  },
+  {
+    id: 'h3',
+    name: 'Children\'s Hospital',
+    address: '789 Pine St, Uptown',
+    phone: '+1 (555) 345-6789',
+    totalTokens: 20
+  },
+  {
+    id: 'h4',
+    name: 'Heart Care Institute',
+    address: '321 Cedar Blvd, West Side',
+    phone: '+1 (555) 456-7890',
+    totalTokens: 35
+  },
+  {
+    id: 'h5',
+    name: 'Skin & Beauty Clinic',
+    address: '654 Maple Dr, East Side',
+    phone: '+1 (555) 567-8901',
+    totalTokens: 15
+  }
+];
+
+// Generate estimated times for tokens (starting from 9 AM, 15 minutes per token)
+const generateEstimatedTime = (tokenNumber: number): string => {
+  const startHour = 9;
+  const minutesPerToken = 15;
+  const totalMinutes = (tokenNumber - 1) * minutesPerToken;
+  const hours = startHour + Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const displayHour = hours > 12 ? hours - 12 : hours;
+  
+  return `${displayHour}:${minutes.toString().padStart(2, '0')} ${period}`;
+};
+
+export const useAppointmentStore = create<AppointmentState>((set, get) => ({
+  hospitals: mockHospitals,
+  appointmentTypes,
+  
+  appointments: [
+    {
+      id: '1',
+      doctorId: '1',
+      doctorName: 'Dr. Sarah Johnson',
+      specialty: 'Cardiologist',
+      hospitalId: 'h1',
+      hospitalName: 'City General Hospital',
+      hospitalAddress: '123 Main St, Downtown',
+      date: '2025-06-02',
+      tokenNumber: 5,
+      estimatedTime: '10:00 AM',
+      duration: '30 minutes',
+      status: 'confirmed',
+      type: 'Consultation',
+      notes: 'Annual heart checkup',
+      doctorImage: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?q=80&w=2070&auto=format&fit=crop',
+      rating: 4.8,
+      experience: '15 years'
+    },
+    {
+      id: '2',
+      doctorId: '2',
+      doctorName: 'Dr. Michael Chen',
+      specialty: 'Dermatologist',
+      hospitalId: 'h2',
+      hospitalName: 'Medical Center Downtown',
+      hospitalAddress: '456 Oak Ave, Midtown',
+      date: '2025-06-10',
+      tokenNumber: 12,
+      estimatedTime: '11:45 AM',
+      duration: '45 minutes',
+      status: 'pending',
+      type: 'Follow-up',
+      notes: 'Skin condition follow-up',
+      doctorImage: 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?q=80&w=2070&auto=format&fit=crop',
+      rating: 4.6,
+      experience: '12 years'
+    },
+    {
+      id: '3',
+      doctorId: '3',
+      doctorName: 'Dr. Emily Rodriguez',
+      specialty: 'Pediatrician',
+      hospitalId: 'h3',
+      hospitalName: 'Children\'s Hospital',
+      hospitalAddress: '789 Pine St, Uptown',
+      date: '2025-05-20',
+      tokenNumber: 8,
+      estimatedTime: '10:45 AM',
+      duration: '60 minutes',
+      status: 'completed',
+      type: 'Consultation',
+      notes: 'Routine checkup',
+      doctorImage: 'https://images.unsplash.com/photo-1594824476967-48c8b964273f?q=80&w=987&auto=format&fit=crop',
+      rating: 4.9,
+      experience: '18 years'
+    }
+  ],
+  
+  addAppointment: (appointment) => set((state) => ({
+    appointments: [...state.appointments, appointment]
+  })),
+  
+  updateAppointment: (id, updates) => set((state) => ({
+    appointments: state.appointments.map((appointment) => 
+      appointment.id === id ? { ...appointment, ...updates } : appointment
     )
-);
+  })),
+  
+  cancelAppointment: (id) => set((state) => ({
+    appointments: state.appointments.map((appointment) => 
+      appointment.id === id ? { ...appointment, status: 'cancelled' } : appointment
+    )
+  })),
+
+  getAppointmentById: (id) => {
+    const state = get();
+    return state.appointments.find(appointment => appointment.id === id);
+  },
+
+  getHospitalsByDoctorId: (doctorId) => {
+    // Mock logic: different doctors practice at different hospitals
+    const doctorHospitalMap: { [key: string]: string[] } = {
+      '1': ['h1', 'h4'], // Dr. Sarah Johnson - Cardiologist
+      '2': ['h2', 'h5'], // Dr. Michael Chen - Dermatologist  
+      '3': ['h3', 'h1'], // Dr. Emily Rodriguez - Pediatrician
+      '4': ['h1', 'h2'], // Dr. James Wilson - Orthopedic
+    };
+    
+    const hospitalIds = doctorHospitalMap[doctorId] || ['h1'];
+    const state = get();
+    return state.hospitals.filter(hospital => hospitalIds.includes(hospital.id));
+  },
+
+  getTokenAvailability: (doctorId, hospitalId, date) => {
+    const state = get();
+    const hospital = state.hospitals.find(h => h.id === hospitalId);
+    if (!hospital) return [];
+
+    // Get existing appointments for this doctor, hospital, and date
+    const existingAppointments = state.appointments.filter(
+      apt => apt.doctorId === doctorId && 
+             apt.hospitalId === hospitalId && 
+             apt.date === date &&
+             apt.status !== 'cancelled'
+    );
+
+    const bookedTokens = existingAppointments.map(apt => apt.tokenNumber);
+
+    // Generate token slots
+    const tokens: TokenSlot[] = [];
+    for (let i = 1; i <= hospital.totalTokens; i++) {
+      const isBooked = bookedTokens.includes(i);
+      const bookedAppointment = existingAppointments.find(apt => apt.tokenNumber === i);
+      
+      tokens.push({
+        tokenNumber: i,
+        isBooked,
+        patientName: isBooked ? bookedAppointment?.notes || 'Booked' : undefined,
+        time: generateEstimatedTime(i)
+      });
+    }
+
+    return tokens;
+  },
+
+  getAppointmentTypes: () => {
+    return appointmentTypes;
+  }
+}));
