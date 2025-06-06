@@ -4,6 +4,7 @@ import { Hospital, TokenSlot, AppointmentType } from '../types/appointment';
 export type AppointmentStatus = 'pending' | 'confirmed' | 'cancelled' | 'completed';
 
 export interface Appointment {
+  paymentId?: string;
   id: string;
   doctorId: string;
   doctorName: string;

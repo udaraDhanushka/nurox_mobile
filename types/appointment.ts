@@ -45,6 +45,7 @@ export interface Appointment {
   doctorImage: string;
   rating: number;
   experience: string;
+  // paymentId: string;
 }
 
 export interface Doctor {

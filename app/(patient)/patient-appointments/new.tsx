@@ -62,7 +62,7 @@ export default function NewAppointmentScreen() {
   const [showHospitalDropdown, setShowHospitalDropdown] = useState(false);
   const [showDatePickerModal, setShowDatePickerModal] = useState(false);
 
-  // FIXED: Get current date in local timezone (Sri Lankan if device is set correctly)
+  // Get current date in local timezone (Sri Lankan if device is set correctly)
   const getCurrentDate = () => {
     const now = new Date();
     // Normalize to start of day to avoid time-related issues
@@ -73,7 +73,7 @@ export default function NewAppointmentScreen() {
     return `${year}-${month}-${day}`;
   };
 
-  // FIXED: Reset form function
+  // Reset form function
   const resetForm = React.useCallback(() => {
     setSelectedDoctor(null);
     setAvailableHospitals([]);
@@ -93,7 +93,7 @@ export default function NewAppointmentScreen() {
     setSelectedDate(getCurrentDate());
   }, []);
 
-  // FIXED: Reset form when navigating back using useFocusEffect
+  // Reset form when navigating back using useFocusEffect
   useFocusEffect(
     React.useCallback(() => {
       // Reset form when screen comes into focus
@@ -112,7 +112,7 @@ export default function NewAppointmentScreen() {
     }
   }, [selectedDoctor]);
 
-  // FIXED: Better token availability logic with fallback
+  // Better token availability logic with fallback
   useEffect(() => {
     if (selectedDoctor && selectedHospital && selectedDate) {
       console.log('Fetching tokens for:', { 
@@ -123,7 +123,7 @@ export default function NewAppointmentScreen() {
       
       let tokens = getTokenAvailability(selectedDoctor.id, selectedHospital.id, selectedDate);
       
-      // FALLBACK: If no tokens from store, generate mock tokens
+      // If no tokens from store, generate mock tokens
       if (!tokens || tokens.length === 0) {
         console.log('No tokens from store, generating fallback tokens');
         tokens = generateFallbackTokens();
@@ -135,7 +135,7 @@ export default function NewAppointmentScreen() {
     }
   }, [selectedDoctor, selectedHospital, selectedDate]);
 
-  // FALLBACK: Generate mock tokens if store doesn't return any
+  // Generate mock tokens if store doesn't return any
   const generateFallbackTokens = (): TokenSlot[] => {
     const tokens: TokenSlot[] = [];
     for (let i = 1; i <= 20; i++) {
@@ -211,7 +211,9 @@ export default function NewAppointmentScreen() {
       duration: '30 min',
       type: selectedType as AppointmentType,
       status: 'pending' as const,
+      paymentId: undefined,
       notes
+      
     };
 
     // Store appointment temporarily (in real app, you might use a different approach)
@@ -227,7 +229,7 @@ export default function NewAppointmentScreen() {
             resetForm();
             // Navigate to payment screen with appointment details
             router.push({
-              pathname: '/(patient)/payments/[id]',
+              pathname: '/(patient)/payments',
               params: {
                 appointmentId: newAppointment.id,
                 doctorName: selectedDoctor.name,

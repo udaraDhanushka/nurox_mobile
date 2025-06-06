@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, TextInput, Alert, Image } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, CreditCard, Smartphone, Shield, Lock, Calendar, User, Building, Clock, CheckCircle } from 'lucide-react-native';
+import { ArrowLeft, CreditCard, Smartphone, Shield, Lock, Calendar, User, Building, Clock, CheckCircle, FileText } from 'lucide-react-native';
 import { COLORS, SIZES, SHADOWS } from '@/constants/theme';
 import { Button } from '@/components/Button';
 
@@ -56,19 +56,66 @@ export default function PaymentScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   
-  // Mock appointment data - in real app, this would come from params or store
+  // Debug: Log received parameters (remove in production)
+  console.log('Payment Screen Parameters:', params);
+  
+  // Validate required parameters
+  const hasRequiredParams = params.doctorName && params.specialty && params.hospitalName && 
+                           params.date && params.time && params.tokenNumber;
+  
+  if (!hasRequiredParams) {
+    console.warn('Missing required appointment parameters');
+  }
+  
+  // Extract appointment data from parameters (passed from appointment screen)
   const appointmentData = {
-    doctorName: 'Dr. Sarah Johnson',
-    specialty: 'Cardiologist',
-    hospitalName: 'Heart Care Institute',
-    date: '2025-06-06',
-    time: '10:30 AM',
-    tokenNumber: 15,
-    consultationFee: 150.00,
+    appointmentId: params.appointmentId as string || '',
+    doctorName: params.doctorName as string || 'Dr. Sarah Johnson',
+    specialty: params.specialty as string || 'Cardiologist', 
+    hospitalName: params.hospitalName as string || 'Heart Care Institute',
+    date: params.date as string || '2025-06-06',
+    time: params.time as string || '10:30 AM',
+    tokenNumber: parseInt(params.tokenNumber as string) || 15,
+    appointmentType: params.appointmentType as string || 'Consultation',
+    notes: params.notes as string || '',
+    // Calculate fees based on appointment type and doctor specialty
+    consultationFee: calculateConsultationFee(params.specialty as string, params.appointmentType as string),
     hospitalFee: 25.00,
-    tax: 17.50,
-    total: 192.50
+    tax: 0, // Will be calculated below
+    total: 0 // Will be calculated below
   };
+
+  // Calculate tax and total
+  const subtotal = appointmentData.consultationFee + appointmentData.hospitalFee;
+  appointmentData.tax = subtotal * 0.10; // 10% tax
+  appointmentData.total = subtotal + appointmentData.tax;
+
+  // Function to calculate consultation fee based on specialty and appointment type
+  function calculateConsultationFee(specialty: string, appointmentType: string): number {
+    const baseFeesBySpecialty: { [key: string]: number } = {
+      'Cardiologist': 200.00,
+      'Dermatologist': 150.00,
+      'Pediatrician': 120.00,
+      'Orthopedic': 180.00,
+      'Neurology': 250.00,
+      'ENT Specialist': 140.00,
+      'General Physician': 100.00,
+    };
+    
+    const typeMultipliers: { [key: string]: number } = {
+      'Consultation': 1.0,
+      'Follow-up': 0.7,
+      'Routine Checkup': 0.8,
+      'Specialist Consultation': 1.2,
+      'Emergency': 1.5,
+      'Vaccination': 0.5
+    };
+    
+    const baseFee = baseFeesBySpecialty[specialty] || 150.00;
+    const multiplier = typeMultipliers[appointmentType] || 1.0;
+    
+    return Math.round(baseFee * multiplier * 100) / 100; // Round to 2 decimal places
+  }
 
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('');
   const [cardNumber, setCardNumber] = useState('');
@@ -113,11 +160,15 @@ export default function PaymentScreen() {
       setIsProcessing(false);
       Alert.alert(
         'Payment Successful! 🎉',
-        `Your appointment has been booked and payment of $${appointmentData.total.toFixed(2)} has been processed successfully.`,
+        `Your appointment has been booked and payment of ${appointmentData.total.toFixed(2)} has been processed successfully.\n\nAppointment Details:\n• Doctor: ${appointmentData.doctorName}\n• Date: ${new Date(appointmentData.date).toLocaleDateString()}\n• Time: ${appointmentData.time}\n• Token: #${appointmentData.tokenNumber}`,
         [
           {
-            text: 'View Appointment',
-            onPress: () => router.push('/(patient)/patient-appointments')
+            text: 'View Appointments',
+            onPress: () => router.push(`/patient-appointments/${appointmentData.appointmentId}`)
+          },
+          {
+            text: 'View Receipt', 
+            onPress: () => router.push('/(patient)/patient-billing-history')
           }
         ]
       );
@@ -153,12 +204,26 @@ export default function PaymentScreen() {
             {new Date(appointmentData.date).toLocaleDateString('en-US', { 
               weekday: 'long', 
               month: 'long', 
-              day: 'numeric' 
+              day: 'numeric',
+              year: 'numeric'
             })}
           </Text>
           <Text style={styles.summarySubValue}>
             {appointmentData.time} • Token #{appointmentData.tokenNumber}
           </Text>
+        </View>
+      </View>
+
+      <View style={styles.summaryItem}>
+        <FileText size={20} color={COLORS.primary} />
+        <View style={styles.summaryContent}>
+          <Text style={styles.summaryLabel}>Appointment Type</Text>
+          <Text style={styles.summaryValue}>{appointmentData.appointmentType}</Text>
+          {appointmentData.notes && (
+            <Text style={styles.summarySubValue} numberOfLines={2}>
+              Notes: {appointmentData.notes}
+            </Text>
+          )}
         </View>
       </View>
     </View>
@@ -169,7 +234,9 @@ export default function PaymentScreen() {
       <Text style={styles.cardTitle}>Payment Breakdown</Text>
       
       <View style={styles.pricingRow}>
-        <Text style={styles.pricingLabel}>Consultation Fee</Text>
+        <Text style={styles.pricingLabel}>
+          {appointmentData.appointmentType} Fee ({appointmentData.specialty})
+        </Text>
         <Text style={styles.pricingValue}>${appointmentData.consultationFee.toFixed(2)}</Text>
       </View>
       
@@ -179,7 +246,7 @@ export default function PaymentScreen() {
       </View>
       
       <View style={styles.pricingRow}>
-        <Text style={styles.pricingLabel}>Tax</Text>
+        <Text style={styles.pricingLabel}>Tax (10%)</Text>
         <Text style={styles.pricingValue}>${appointmentData.tax.toFixed(2)}</Text>
       </View>
       
@@ -318,6 +385,17 @@ export default function PaymentScreen() {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Debug info for missing parameters (remove in production) */}
+        {!hasRequiredParams && (
+          <View style={styles.debugCard}>
+            <Text style={styles.debugTitle}>⚠️ Debug Info</Text>
+            <Text style={styles.debugText}>
+              Some appointment parameters are missing. Using default values.
+              {'\n'}Received parameters: {Object.keys(params).length}
+            </Text>
+          </View>
+        )}
+        
         {renderAppointmentSummary()}
         {renderPricingBreakdown()}
         {renderPaymentMethods()}
@@ -553,5 +631,24 @@ const styles = StyleSheet.create({
   payButton: {
     backgroundColor: COLORS.primary,
     paddingVertical: 16,
+  },
+  debugCard: {
+    backgroundColor: '#FFF3CD',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#FFEAA7',
+  },
+  debugTitle: {
+    fontSize: SIZES.sm,
+    fontWeight: '600',
+    color: '#856404',
+    marginBottom: 4,
+  },
+  debugText: {
+    fontSize: SIZES.xs,
+    color: '#856404',
+    lineHeight: 16,
   },
 });

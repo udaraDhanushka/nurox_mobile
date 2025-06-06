@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, TextInput, Alert, FlatList } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,14 +15,15 @@ import {
   TrendingUp,
   DollarSign,
   Receipt,
-  Smartphone,
   Shield
 } from 'lucide-react-native';
 import { COLORS, SIZES, SHADOWS } from '@/constants/theme';
 import { Button } from '@/components/Button';
+import { useAppointmentStore } from '@/store/appointmentStore';
 
 interface BillingItem {
   id: string;
+  appointmentId: string;
   date: string;
   doctorName: string;
   specialty: string;
@@ -33,91 +34,88 @@ interface BillingItem {
   status: 'paid' | 'pending' | 'refunded' | 'failed';
   receiptId: string;
   insuranceCovered?: number;
+  paymentId?: string;
+  consultationFee: number;
+  hospitalFee: number;
+  tax: number;
 }
-
-const mockBillingData: BillingItem[] = [
-  {
-    id: '1',
-    date: '2025-06-06',
-    doctorName: 'Dr. Sarah Johnson',
-    specialty: 'Cardiologist',
-    hospitalName: 'Heart Care Institute',
-    appointmentType: 'Consultation',
-    amount: 192.50,
-    paymentMethod: 'card',
-    status: 'paid',
-    receiptId: 'RCP-2025-001',
-  },
-  {
-    id: '2',
-    date: '2025-05-28',
-    doctorName: 'Dr. Michael Chen',
-    specialty: 'Dermatologist',
-    hospitalName: 'Skin Health Center',
-    appointmentType: 'Follow-up',
-    amount: 125.00,
-    paymentMethod: 'apple_pay',
-    status: 'paid',
-    receiptId: 'RCP-2025-002',
-  },
-  {
-    id: '3',
-    date: '2025-05-15',
-    doctorName: 'Dr. Emily Rodriguez',
-    specialty: 'Pediatrician',
-    hospitalName: 'Children\'s Medical Center',
-    appointmentType: 'Routine Checkup',
-    amount: 280.00,
-    paymentMethod: 'insurance',
-    status: 'paid',
-    receiptId: 'RCP-2025-003',
-    insuranceCovered: 210.00,
-  },
-  {
-    id: '4',
-    date: '2025-04-22',
-    doctorName: 'Dr. James Wilson',
-    specialty: 'Orthopedic',
-    hospitalName: 'Bone & Joint Hospital',
-    appointmentType: 'Specialist Consultation',
-    amount: 350.00,
-    paymentMethod: 'card',
-    status: 'paid',
-    receiptId: 'RCP-2025-004',
-  },
-  {
-    id: '5',
-    date: '2025-04-10',
-    doctorName: 'Dr. Lisa Park',
-    specialty: 'Neurology',
-    hospitalName: 'Brain Health Institute',
-    appointmentType: 'Emergency',
-    amount: 425.00,
-    paymentMethod: 'google_pay',
-    status: 'pending',
-    receiptId: 'RCP-2025-005',
-  },
-  {
-    id: '6',
-    date: '2025-03-28',
-    doctorName: 'Dr. Robert Kim',
-    specialty: 'ENT Specialist',
-    hospitalName: 'Ear Nose Throat Clinic',
-    appointmentType: 'Consultation',
-    amount: 175.00,
-    paymentMethod: 'card',
-    status: 'refunded',
-    receiptId: 'RCP-2025-006',
-  }
-];
 
 export default function BillingHistoryScreen() {
   const router = useRouter();
+  const { appointments } = useAppointmentStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'paid' | 'pending' | 'refunded'>('all');
   const [showFilters, setShowFilters] = useState(false);
 
-  const filteredData = mockBillingData.filter(item => {
+  // Convert appointments to billing items
+  const billingData: BillingItem[] = useMemo(() => {
+    return appointments
+      .filter(appointment => appointment.status !== 'cancelled') // Exclude cancelled appointments
+      .map(appointment => {
+        // Calculate fees based on specialty and appointment type
+        const consultationFee = calculateConsultationFee(appointment.specialty, appointment.type);
+        const hospitalFee = 25.00;
+        const subtotal = consultationFee + hospitalFee;
+        const tax = subtotal * 0.10;
+        const total = subtotal + tax;
+
+        // Determine payment status based on appointment status
+        let paymentStatus: 'paid' | 'pending' | 'refunded' | 'failed' = 'pending';
+        if (appointment.status === 'completed') {
+          paymentStatus = 'paid';
+        } else if (appointment.status === 'confirmed' || appointment.status === 'pending') {
+          paymentStatus = 'paid'; // Assume payment was made to confirm
+        }
+
+        return {
+          id: `bill-${appointment.id}`,
+          appointmentId: appointment.id,
+          date: appointment.date,
+          doctorName: appointment.doctorName,
+          specialty: appointment.specialty,
+          hospitalName: appointment.hospitalName,
+          appointmentType: appointment.type,
+          amount: total,
+          paymentMethod: 'card' as const, // Default to card, could be stored in appointment
+          status: paymentStatus,
+          receiptId: `RCP-${appointment.id.slice(-6).toUpperCase()}`,
+          consultationFee,
+          hospitalFee,
+          tax,
+          paymentId: appointment.paymentId || undefined,
+        };
+      })
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()); // Sort by date, newest first
+  }, [appointments]);
+
+  // Calculate consultation fee based on specialty and appointment type
+  function calculateConsultationFee(specialty: string, appointmentType: string): number {
+    const baseFeesBySpecialty: { [key: string]: number } = {
+      'Cardiologist': 200.00,
+      'Dermatologist': 150.00,
+      'Pediatrician': 120.00,
+      'Orthopedic': 180.00,
+      'Neurology': 250.00,
+      'ENT Specialist': 140.00,
+      'General Physician': 100.00,
+    };
+    
+    const typeMultipliers: { [key: string]: number } = {
+      'Consultation': 1.0,
+      'Follow-up': 0.7,
+      'Routine Checkup': 0.8,
+      'Specialist Consultation': 1.2,
+      'Emergency': 1.5,
+      'Vaccination': 0.5
+    };
+    
+    const baseFee = baseFeesBySpecialty[specialty] || 150.00;
+    const multiplier = typeMultipliers[appointmentType] || 1.0;
+    
+    return Math.round(baseFee * multiplier * 100) / 100;
+  }
+
+  const filteredData = billingData.filter(item => {
     const matchesSearch = 
       item.doctorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.specialty.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -130,7 +128,7 @@ export default function BillingHistoryScreen() {
   });
 
   const getTotalSpent = () => {
-    return mockBillingData
+    return billingData
       .filter(item => item.status === 'paid')
       .reduce((total, item) => total + item.amount, 0);
   };
@@ -139,7 +137,7 @@ export default function BillingHistoryScreen() {
     const currentMonth = new Date().getMonth();
     const currentYear = new Date().getFullYear();
     
-    return mockBillingData
+    return billingData
       .filter(item => {
         const itemDate = new Date(item.date);
         return itemDate.getMonth() === currentMonth && 
@@ -198,8 +196,14 @@ export default function BillingHistoryScreen() {
   const handleViewDetails = (item: BillingItem) => {
     Alert.alert(
       'Payment Details',
-      `Receipt ID: ${item.receiptId}\nDoctor: ${item.doctorName}\nHospital: ${item.hospitalName}\nAmount: $${item.amount.toFixed(2)}\nStatus: ${item.status.toUpperCase()}\nDate: ${new Date(item.date).toLocaleDateString()}`,
-      [{ text: 'OK' }]
+      `Receipt ID: ${item.receiptId}\nDoctor: ${item.doctorName}\nHospital: ${item.hospitalName}\nConsultation Fee: $${item.consultationFee.toFixed(2)}\nHospital Fee: $${item.hospitalFee.toFixed(2)}\nTax: $${item.tax.toFixed(2)}\nTotal Amount: $${item.amount.toFixed(2)}\nStatus: ${item.status.toUpperCase()}\nDate: ${new Date(item.date).toLocaleDateString()}${item.paymentId ? `\nPayment ID: ${item.paymentId}` : ''}`,
+      [
+        { text: 'OK' },
+        { 
+          text: 'View Appointment', 
+          onPress: () => router.push(`/(patient)/patient-appointments/${item.appointmentId}`)
+        }
+      ]
     );
   };
 
@@ -219,7 +223,7 @@ export default function BillingHistoryScreen() {
       
       <View style={styles.summaryCard}>
         <Receipt size={24} color={COLORS.warning} />
-        <Text style={styles.summaryValue}>{mockBillingData.length}</Text>
+        <Text style={styles.summaryValue}>{billingData.length}</Text>
         <Text style={styles.summaryLabel}>Total Bills</Text>
       </View>
     </View>
@@ -325,6 +329,11 @@ export default function BillingHistoryScreen() {
           <Text style={styles.detailText}>{item.appointmentType}</Text>
         </View>
         
+        <View style={styles.detailRow}>
+          <Receipt size={16} color={COLORS.textSecondary} />
+          <Text style={styles.detailText}>Receipt: {item.receiptId}</Text>
+        </View>
+        
         {item.insuranceCovered && (
           <View style={styles.detailRow}>
             <Shield size={16} color={COLORS.success} />
@@ -350,6 +359,14 @@ export default function BillingHistoryScreen() {
         >
           <Download size={16} color={COLORS.primary} />
           <Text style={styles.actionButtonText}>Receipt</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => router.push(`/(patient)/patient-appointments/${item.appointmentId}`)}
+        >
+          <Calendar size={16} color={COLORS.primary} />
+          <Text style={styles.actionButtonText}>Appointment</Text>
         </TouchableOpacity>
         
         <TouchableOpacity style={styles.moreButton}>
@@ -419,8 +436,18 @@ export default function BillingHistoryScreen() {
               <Receipt size={48} color={COLORS.textSecondary} />
               <Text style={styles.emptyStateTitle}>No billing records found</Text>
               <Text style={styles.emptyStateSubtitle}>
-                {searchQuery ? 'Try adjusting your search terms' : 'Your payment history will appear here'}
+                {searchQuery ? 'Try adjusting your search terms' : 
+                 billingData.length === 0 ? 'Book your first appointment to see payment history' :
+                 'Your payment history will appear here'}
               </Text>
+              {billingData.length === 0 && (
+                <TouchableOpacity
+                  style={styles.scheduleButton}
+                  onPress={() => router.push('/(patient)/patient-appointments/new')}
+                >
+                  <Text style={styles.scheduleButtonText}>Book Appointment</Text>
+                </TouchableOpacity>
+              )}
             </View>
           )}
         </View>
@@ -694,5 +721,18 @@ const styles = StyleSheet.create({
     fontSize: SIZES.sm,
     color: COLORS.textSecondary,
     textAlign: 'center',
+    marginBottom: 24,
+    paddingHorizontal: 32,
+  },
+  scheduleButton: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  scheduleButtonText: {
+    color: COLORS.white,
+    fontSize: SIZES.md,
+    fontWeight: '600',
   },
 });
