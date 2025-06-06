@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Image, Switch, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { User, Shield, FileText, LogOut, Lock, Camera, Sun, Moon, CreditCard, Globe } from 'lucide-react-native';
+import { User, Shield, FileText, LogOut, Lock, Camera, Sun, Moon, CreditCard, Globe, FileClock } from 'lucide-react-native';
 import { COLORS, SIZES, SHADOWS } from '@/constants/theme';
 import { useAuthStore } from '@/store/authStore';
 import * as ImagePicker from 'expo-image-picker';
@@ -33,6 +33,11 @@ export default function ProfileScreen() {
       icon: <Shield size={24} color={isDarkMode ? COLORS.white : COLORS.primary} />,
       onPress: () => router.push('/(patient)/profile/insurance'),
     },
+    {
+        title: t('billingHistory'),
+        icon: <FileClock size={24} color={isDarkMode ? COLORS.white : COLORS.primary} />,
+        onPress: () => router.push('/(patient)/patient-billing-history'),
+      },
     {
       title: t('paymentMethods'),
       icon: <CreditCard size={24} color={isDarkMode ? COLORS.white : COLORS.primary} />,

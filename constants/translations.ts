@@ -42,6 +42,7 @@ export type TranslationKey =
   | 'medicalHistory'
   | 'insuranceInformation'
   | 'paymentMethods'
+  |  'billingHistory'
   
   // Profile - Doctor
   | 'medicalLicense'
@@ -218,6 +219,7 @@ export const translations: TranslationsType = {
     medicalHistory: 'Medical History',
     insuranceInformation: 'Insurance Information',
     paymentMethods: 'Payment Methods',
+    billingHistory: 'Billing Hisory',
     
     // Profile - Doctor
     medicalLicense: 'Medical License',
@@ -387,6 +389,7 @@ export const translations: TranslationsType = {
     medicalHistory: 'වෛද්‍ය ඉතිහාසය',
     insuranceInformation: 'රක්ෂණ තොරතුරු',
     paymentMethods: 'ගෙවීම් ක්‍රම',
+    billingHistory: 'බිල්පත් ඉතිහාසය',
     
     // Profile - Doctor
     medicalLicense: 'වෛද්‍ය බලපත්‍රය',
@@ -556,6 +559,7 @@ export const translations: TranslationsType = {
     medicalHistory: 'மருத்துவ வரலாறு',
     insuranceInformation: 'காப்பீட்டு தகவல்',
     paymentMethods: 'கட்டண முறைகள்',
+    billingHistory: 'பில்லிங் வரலாறு',
     
     // Profile - Doctor
     medicalLicense: 'மருத்துவ உரிமம்',
