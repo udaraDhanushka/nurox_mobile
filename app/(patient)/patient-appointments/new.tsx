@@ -349,7 +349,7 @@ export default function NewAppointmentScreen() {
     </View>
   );
 
-  // FIXED: Clean date selection with calendar picker modal
+  // Clean date selection with calendar picker modal
   const renderDateSelection = () => {
     const formatSelectedDate = (dateString: string) => {
       const date = new Date(dateString);
