@@ -80,7 +80,7 @@ export interface DoctorAppointment {
   patientPhone: string;
   date: string;
   tokenNumber: number;
-  estimatedTime: string;
+  time: string;
   duration: string;
   type: string;
   status: string;

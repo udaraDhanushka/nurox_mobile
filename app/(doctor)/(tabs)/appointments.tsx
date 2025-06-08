@@ -80,12 +80,6 @@ export default function DoctorAppointmentsScreen() {
           <TouchableOpacity style={styles.filterButton}>
             <Filter size={20} color={COLORS.primary} />
           </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.addButton}
-            onPress={() => router.push('/(doctor)/appointments/new')}
-          >
-            <Plus size={20} color={COLORS.white} />
-          </TouchableOpacity>
         </View>
       </View>
 
@@ -139,7 +133,10 @@ export default function DoctorAppointmentsScreen() {
             <TouchableOpacity
               key={appointment.id}
               style={styles.appointmentCard}
-              onPress={() => router.push(`/(doctor)/appointments/${appointment.id}`)}
+              onPress={() => router.push({
+                pathname: '/(doctor)/doctor-appointments/[id]',
+                params: { id: appointment.id }
+              })}
             >
               <View style={styles.timeContainer}>
                 <Text style={styles.appointmentTime}>{appointment.time}</Text>

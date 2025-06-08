@@ -104,17 +104,16 @@ export const useNotificationStore = create<NotificationStore>((set, get) => ({
   markAsRead: (id: string) => {
     set((state) => ({
       notifications: state.notifications.map((notification) =>
-        notification.id === id ? { ...notification, read: true } : notification
-      ),
+        notification && notification.id === id ? { ...notification, read: true } : notification
+      ).filter(Boolean), // Filter out any null/undefined notifications
     }));
   },
   
   markAllAsRead: () => {
     set((state) => ({
-      notifications: state.notifications.map((notification) => ({
-        ...notification,
-        read: true,
-      })),
+      notifications: state.notifications.map((notification) => 
+        notification ? { ...notification, read: true } : notification
+      ).filter(Boolean), // Filter out any null/undefined notifications
     }));
   },
   
@@ -127,17 +126,17 @@ export const useNotificationStore = create<NotificationStore>((set, get) => ({
     };
     
     set((state) => ({
-      notifications: [newNotification, ...state.notifications],
+      notifications: [newNotification, ...state.notifications.filter(Boolean)], // Filter out nulls
     }));
   },
   
   removeNotification: (id: string) => {
     set((state) => ({
-      notifications: state.notifications.filter((notification) => notification.id !== id),
+      notifications: state.notifications.filter((notification) => notification && notification.id !== id),
     }));
   },
   
   getUnreadCount: () => {
-    return get().notifications.filter((notification) => !notification.read).length;
+    return get().notifications.filter((notification) => notification && !notification.read).length;
   },
 }));

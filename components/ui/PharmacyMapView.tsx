@@ -12,7 +12,7 @@ interface PharmacyMapViewProps {
   onGetDirections: () => void;
 }
 
-// FIXED: Updated interface to match the actual usage
+// Updated interface to match the actual usage
 interface NativeMapViewProps {
   pharmacy: Pharmacy;
   userLocation: { latitude: number; longitude: number } | null;
@@ -42,7 +42,7 @@ const MapFallback: React.FC<{
   </View>
 );
 
-// FIXED: Native Map Component with proper error handling
+// Native Map Component with proper error handling
 const NativeMapView = React.lazy(() => {
   if (Platform.OS === 'web') {
     // Return a fallback component for web

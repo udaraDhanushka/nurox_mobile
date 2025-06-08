@@ -95,7 +95,7 @@ export default function DoctorPrescriptionsScreen() {
         <Text style={styles.title}>Prescriptions</Text>
         <TouchableOpacity 
           style={styles.addButton}
-          onPress={() => router.push('/(doctor)/prescriptions/new')}
+          onPress={() => router.push('/(doctor)/doctor-prescriptions/new')}
         >
           <Plus size={24} color={COLORS.white} />
         </TouchableOpacity>
@@ -124,7 +124,10 @@ export default function DoctorPrescriptionsScreen() {
           <TouchableOpacity
             key={prescription.id}
             style={styles.prescriptionCard}
-            onPress={() => router.push(`/(doctor)/prescriptions/${prescription.id}`)}
+            onPress={() => router.push({
+              pathname: '/(doctor)/doctor-prescriptions/[id]',
+              params: {id: prescription.id}
+            })}
           >
             <View style={styles.prescriptionHeader}>
               <Image source={{ uri: prescription.patientImage }} style={styles.patientImage} />
