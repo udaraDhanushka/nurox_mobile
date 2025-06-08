@@ -112,7 +112,7 @@ export default function DoctorDashboardScreen() {
                 <View style={styles.sectionContainer}>
                     <View style={styles.sectionHeader}>
                         <Text style={styles.sectionTitle}>Today's Appointments</Text>
-                        <TouchableOpacity onPress={() => router.push('/appointments')}>
+                        <TouchableOpacity onPress={() => router.push('/(doctor)/appointments')}>
                             <Text style={styles.seeAllText}>See All</Text>
                         </TouchableOpacity>
                     </View>
@@ -121,7 +121,10 @@ export default function DoctorDashboardScreen() {
                         <TouchableOpacity
                             key={appointment.id}
                             style={styles.appointmentCard}
-                            onPress={() => router.push(`/appointments/${appointment.id}`)}
+                            onPress={() => router.push({
+                                pathname: '/(doctor)/doctor-appointments/[id]',
+                                params: { id: appointment.id }
+                            })}
                         >
                             <View style={styles.appointmentTimeContainer}>
                                 <Text style={styles.appointmentTime}>{appointment.time}</Text>
@@ -148,7 +151,7 @@ export default function DoctorDashboardScreen() {
                 <View style={[styles.sectionContainer, { marginBottom: 20 }]}>
                     <View style={styles.sectionHeader}>
                         <Text style={styles.sectionTitle}>Recent Patients</Text>
-                        <TouchableOpacity onPress={() => router.push('/patients')}>
+                        <TouchableOpacity onPress={() => router.push('/(doctor)/(tabs)/patients')}>
                             <Text style={styles.seeAllText}>See All</Text>
                         </TouchableOpacity>
                     </View>
@@ -157,7 +160,10 @@ export default function DoctorDashboardScreen() {
                         <TouchableOpacity
                             key={patient.id}
                             style={styles.patientCard}
-                            onPress={() => router.push(`/patients/${patient.id}`)}
+                            onPress={() => router.push({
+                                pathname: '/(doctor)/doctor-patients/[id]',
+                                params: { id: patient.id }
+                            })}
                         >
                             <Image
                                 source={{ uri: patient.image }}
@@ -171,13 +177,25 @@ export default function DoctorDashboardScreen() {
                             <View style={styles.patientActions}>
                                 <TouchableOpacity
                                     style={styles.actionButton}
-                                    onPress={() => router.push(`/patients/${patient.id}/records`)}
+                                    onPress={(e) => {
+                                        e.stopPropagation();
+                                        router.push({
+                                            pathname: '/(doctor)/doctor-patients/[id]',
+                                            params: { id: patient.id }
+                                        });
+                                    }}
                                 >
                                     <FileText size={16} color={COLORS.primary} />
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     style={styles.actionButton}
-                                    onPress={() => router.push(`/prescriptions/new?patientId=${patient.id}`)}
+                                    onPress={(e) => {
+                                        e.stopPropagation();
+                                        router.push({
+                                            pathname: '/(doctor)/doctor-prescriptions/[id]',
+                                            params: { id: patient.id }
+                                        });
+                                    }}
                                 >
                                     <Activity size={16} color={COLORS.primary} />
                                 </TouchableOpacity>

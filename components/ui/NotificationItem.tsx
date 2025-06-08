@@ -16,8 +16,8 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
 }) => {
   const router = useRouter();
 
-  // FIXED: Add null check for notification
-  if (!notification) {
+  // Add comprehensive null checks for notification
+  if (!notification || typeof notification !== 'object' || !notification.id) {
     return null;
   }
 
@@ -39,6 +39,8 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
   };
 
   const getPriorityColor = () => {
+    if (!notification.priority) return COLORS.success;
+    
     switch (notification.priority) {
       case 'high':
         return COLORS.error;
@@ -50,18 +52,26 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
   };
 
   const formatTimestamp = (timestamp: string): string => {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+    if (!timestamp) return 'Now';
     
-    if (diffInHours < 1) {
-      const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
-      return `${diffInMinutes}m ago`;
-    } else if (diffInHours < 24) {
-      return `${diffInHours}h ago`;
-    } else {
-      const diffInDays = Math.floor(diffInHours / 24);
-      return `${diffInDays}d ago`;
+    try {
+      const date = new Date(timestamp);
+      if (isNaN(date.getTime())) return 'Now';
+      
+      const now = new Date();
+      const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+      
+      if (diffInHours < 1) {
+        const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
+        return `${diffInMinutes}m ago`;
+      } else if (diffInHours < 24) {
+        return `${diffInHours}h ago`;
+      } else {
+        const diffInDays = Math.floor(diffInHours / 24);
+        return `${diffInDays}d ago`;
+      }
+    } catch (error) {
+      return 'Now';
     }
   };
 
@@ -74,8 +84,8 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
     }
   };
 
-  // FIXED: Add null check for read property
-  const isRead = notification.read ?? false;
+  // Add null check for read property with default value
+  const isRead = notification.read === true;
 
   return (
     <TouchableOpacity
@@ -103,7 +113,7 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
               { backgroundColor: getPriorityColor() }
             ]} />
             <Text style={styles.timestamp}>
-              {notification.timestamp ? formatTimestamp(notification.timestamp) : 'Now'}
+              {formatTimestamp(notification.timestamp)}
             </Text>
           </View>
         </View>
