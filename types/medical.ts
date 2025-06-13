@@ -1,4 +1,4 @@
-export type PrescriptionStatus = 'active' | 'completed' | 'cancelled';
+export type PrescriptionStatus = 'active' | 'processing' | 'completed' | 'cancelled';
 
 export interface Medication {
   name: string;
@@ -6,6 +6,22 @@ export interface Medication {
   frequency: string;
   duration: string;
   instructions?: string;
+}
+
+// Types for detected medicines from prescription uploads
+export interface DetectedMedicine {
+  name: string;
+  dosage: string;
+  frequency: string;
+  detected: boolean;
+}
+
+export interface UploadedPrescription {
+  type: 'photo' | 'gallery' | 'pdf';
+  timestamp: string;
+  fileName?: string;
+  fileSize?: number;
+  url?: string;
 }
 
 export interface Prescription {
@@ -16,10 +32,50 @@ export interface Prescription {
   patientId?: string;
   condition?: string;
   medications: Medication[];
-  pharmacy: string;
+  pharmacy?: string; // Made optional since it can be "Not selected"
   refillsRemaining: number;
   status: PrescriptionStatus;
   notes?: string;
+  detectedMedicines?: DetectedMedicine[]; // For uploaded prescription analysis
+  uploadedPrescription?: UploadedPrescription; // For tracking uploads
+}
+
+// Pharmacy related types
+export interface PharmacyMedicine {
+  id: string;
+  medicineName: string;
+  price: number;
+  inStock: boolean;
+  quantity?: number;
+}
+
+export interface Pharmacy {
+  id: string;
+  name: string;
+  address: string;
+  distance: number;
+  rating: number;
+  reviews: number;
+  phone: string;
+  isOpen: boolean;
+  workingHours: {
+    open: string;
+    close: string;
+  };
+  coordinates: {
+    latitude: number;
+    longitude: number;
+  };
+  medicines: PharmacyMedicine[];
+}
+
+// Send prescription modal types
+export interface SendPrescriptionDetails {
+  pharmacy: Pharmacy;
+  prescriptionMedicines: string[];
+  specialInstructions?: string;
+  urgency?: 'routine' | 'urgent';
+  notifyWhenReady?: boolean;
 }
 
 export interface LabResult {
@@ -142,6 +198,18 @@ export interface LabNoteUpload {
   url?: string; // For accessing the uploaded file
 }
 
+export interface PrescriptionUpload {
+  id: string;
+  type: 'photo' | 'gallery' | 'pdf';
+  fileName: string;
+  fileSize: number;
+  uploadDate: string;
+  prescriptionId: string;
+  detectedMedicines: DetectedMedicine[];
+  url?: string;
+  analysisStatus: 'pending' | 'completed' | 'failed';
+}
+
 // Location related types
 export interface UserLocation {
   latitude: number;
@@ -174,4 +242,81 @@ export interface DetailedLabReport extends LabReport {
   estimatedDuration?: string;
   priority?: 'routine' | 'urgent' | 'stat';
   uploadedNotes?: LabNoteUpload[];
+}
+
+// Enhanced prescription with more comprehensive data
+export interface DetailedPrescription extends Prescription {
+  prescriptionImage?: string;
+  qrCode?: string;
+  verificationCode?: string;
+  pharmacyHistory?: Array<{
+    pharmacyName: string;
+    fillDate: string;
+    cost: number;
+  }>;
+  sideEffects?: string[];
+  drugInteractions?: string[];
+  allergies?: string[];
+  uploadHistory?: PrescriptionUpload[];
+}
+
+// Modal component props types
+export interface ShareModalProps {
+  visible: boolean;
+  prescription: any,
+  onClose: () => void;
+  type: 'prescription' | 'lab-report';
+  data: Prescription | LabReport;
+}
+
+export interface SendPrescriptionModalProps {
+  visible: boolean;
+  pharmacy: Pharmacy | null;
+  prescriptionMedicines: string[];
+  onConfirm: (details: SendPrescriptionDetails) => void;
+  onCancel: () => void;
+}
+
+export interface BookingModalProps {
+  visible: boolean;
+  testCenter: TestCenter | null;
+  testName: string;
+  onConfirm: (details: BookingDetails) => void;
+  onCancel: () => void;
+}
+
+// Store action types
+export interface MedicalStoreState {
+  prescriptions: Prescription[];
+  labReports: LabReport[];
+  notifications: Notification[];
+  userLocation: UserLocation | null;
+  nearbyPharmacies: Pharmacy[];
+  nearbyTestCenters: TestCenter[];
+}
+
+export interface MedicalStoreActions {
+  // Prescription actions
+  addPrescription: (prescription: Prescription) => void;
+  updatePrescription: (id: string, updates: Partial<Prescription>) => void;
+  deletePrescription: (id: string) => void;
+  
+  // Lab report actions
+  addLabReport: (labReport: LabReport) => void;
+  updateLabReport: (id: string, updates: Partial<LabReport>) => void;
+  deleteLabReport: (id: string) => void;
+  
+  // Notification actions
+  addNotification: (notification: Notification) => void;
+  markNotificationAsRead: (id: string) => void;
+  deleteNotification: (id: string) => void;
+  
+  // Location actions
+  updateUserLocation: (location: UserLocation) => void;
+  
+  // Pharmacy actions
+  updateNearbyPharmacies: (pharmacies: Pharmacy[]) => void;
+  
+  // Test center actions
+  updateNearbyTestCenters: (testCenters: TestCenter[]) => void;
 }
