@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, FileText, Printer, Share, Trash2, Edit } from 'lucide-react-native';
 import { COLORS, SIZES, SHADOWS } from '../../../constants/theme';
 import { Button } from '@/components/Button';
-import { SharePrescriptionModal } from '@/components/SharePrescriptionModal';
+import ShareModal from '@/components/ShareModal';
 import { useMedicalStore } from '../../../store/medicalStore';
 
 // Enhanced mock prescription data matching New Prescription structure
@@ -352,7 +352,7 @@ export default function PrescriptionDetailScreen() {
       </ScrollView>
 
       {/* Share Modal */}
-      <SharePrescriptionModal
+      <ShareModal
         visible={shareModalVisible}
         onClose={() => setShareModalVisible(false)}
         prescription={prescriptionData}
