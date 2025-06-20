@@ -776,6 +776,9 @@ const styles = StyleSheet.create({
     actionButtons: {
         flexDirection: 'row',
         gap: 8,
+        padding: 10,
+        justifyContent: 'space-between',
+        flexWrap: 'nowrap',
     },
     callButton: {
         flexDirection: 'row',
@@ -785,7 +788,8 @@ const styles = StyleSheet.create({
         borderRadius: 6,
         borderWidth: 1,
         borderColor: COLORS.primary,
-        flex: 1,
+        // flex: 1,
+        width: '30%',
         justifyContent: 'center',
     },
     callButtonText: {
@@ -803,6 +807,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: COLORS.secondary,
         // flex: 1,
+        width: '35%',
         justifyContent: 'center',
     },
     directionsButtonText: {
@@ -819,6 +824,7 @@ const styles = StyleSheet.create({
         borderRadius: 6,
         backgroundColor: COLORS.primary,
         // flex: 1,
+        width: '40%',
         justifyContent: 'center',
     },
     sendButtonDisabled: {

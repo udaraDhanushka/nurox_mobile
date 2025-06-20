@@ -1,9 +1,11 @@
 import { useFonts } from "expo-font";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
+import { StatusBar } from 'react-native';
 import { useEffect } from "react";
 import { useAuthStore } from "../store/authStore";
 import ErrorBoundary from "./error-boundary";
+import { COLORS } from "./constants/theme";
 
 export const unstable_settings = {
   // Ensure that reloading on `/modal` keeps a back button present.
@@ -66,6 +68,7 @@ export default function RootLayout() {
 
   return (
     <ErrorBoundary>
+    <StatusBar barStyle="dark-content" backgroundColor="COLORS.white" />
       <RootLayoutNav />
     </ErrorBoundary>
   );

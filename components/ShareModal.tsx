@@ -29,7 +29,6 @@ import { Button } from '@/components/Button';
 
 interface ShareModalProps {
   visible: boolean;
-  prescription: any,
   onClose: () => void;
   type: 'prescription' | 'lab-report';
   data: any;
@@ -67,7 +66,7 @@ const internalContacts = [
   }
 ];
 
-export default function ShareModal({ visible, onClose, type, data, prescription }: ShareModalProps) {
+export default function ShareModal({ visible, onClose, type, data }: ShareModalProps) {
   const [activeTab, setActiveTab] = useState<'internal' | 'external'>('internal');
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
   const [message, setMessage] = useState('');

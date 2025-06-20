@@ -13,19 +13,8 @@ import PharmacyList from '@/components/PharmacyList';
 import PharmacyMap from '@/components/ui/PharmacyMap';
 import SendPrescriptionModal from '@/components/SendPrescriptionModal';
 import ShareModal from '@/components/ShareModal';
-
-// Types
-interface DetectedMedicine {
-  name: string;
-  dosage: string;
-  frequency: string;
-  detected: boolean;
-}
-
-interface UploadedPrescription {
-  type: 'photo' | 'gallery' | 'pdf';
-  timestamp: string;
-}
+import UploadPrescriptionModal from '@/components/ui/UploadPrescriptionModal';
+import { Prescription, DetectedMedicine, UploadedPrescription, UploadResult } from '@/types/medical';   
 
 export default function PrescriptionDetailsScreen() {
   const router = useRouter();
@@ -36,9 +25,10 @@ export default function PrescriptionDetailsScreen() {
   const [showMap, setShowMap] = useState(false);
   const [showSendModal, setShowSendModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
   const [selectedPharmacy, setSelectedPharmacy] = useState(null);
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
-  const [uploadedPrescription, setUploadedPrescription] = useState<UploadedPrescription | null>(null);
+  const [uploadedPrescriptions, setUploadedPrescriptions] = useState<UploadedPrescription[]>([]);
   const [detectedMedicines, setDetectedMedicines] = useState<DetectedMedicine[]>([]);
 
   const prescription = prescriptions.find(p => p.id === String(id));
@@ -76,35 +66,113 @@ export default function PrescriptionDetailsScreen() {
       [
         { text: 'Request from Current Pharmacy', onPress: () => console.log('Request from Current') },
         { text: 'Find New Pharmacy', onPress: () => setShowPharmacies(true) },
-        { text: 'Upload Prescription Image', onPress: () => handleUploadPrescription() },
+        { text: 'Upload Prescription Image', onPress: () => setShowUploadModal(true) },
         { text: 'Cancel', style: 'cancel' }
       ]
     );
   };
 
   const handleUploadPrescription = () => {
+    setShowUploadModal(true);
+  };
+
+  // Enhanced upload completion handler
+  const handleUploadComplete = (result: UploadResult) => {
+    // Add the uploaded prescription to the list with all required fields
+    const uploadedPrescription: UploadedPrescription = {
+      id: `upload_${Date.now()}`,
+      type: result.type,
+      timestamp: new Date().toISOString(),
+      fileName: result.fileName,
+      fileSize: 0, // This would be calculated from the actual file
+      uri: result.uri,
+      uploadStatus: 'completed',
+      analysisResult: result.analysisResult
+    };
+    
+    // Add source field to detected medicines
+    const detectedMedicinesWithSource: DetectedMedicine[] = result.detectedMedicines.map(medicine => ({
+      ...medicine,
+      id: medicine.id || `medicine_${Date.now()}_${Math.random()}`,
+      source: 'detected' as const,
+      createdAt: new Date().toISOString()
+    }));
+    
+    setUploadedPrescriptions(prev => [...prev, uploadedPrescription]);
+    setDetectedMedicines(prev => [...prev, ...detectedMedicinesWithSource]);
+
+    // Update the prescription in the store
+    updatePrescription(prescription.id, {
+      ...prescription,
+      detectedMedicines: [...(prescription.detectedMedicines || []), ...detectedMedicinesWithSource],
+      uploadedPrescriptions: [...(prescription.uploadedPrescriptions || []), uploadedPrescription],
+      lastUpdated: new Date().toISOString()
+    });
+
     Alert.alert(
-      'Upload Prescription',
-      'Choose an option to upload your prescription:',
+      'Upload Successful! 🎉',
+      `Successfully detected ${result.detectedMedicines.length} medicine(s) from your prescription.\n\nConfidence: ${Math.round(result.confidence * 100)}%\nProcessing time: ${result.processingTime}s`,
       [
-        { text: 'Take Photo', onPress: () => handleTakePhoto() },
-        { text: 'Choose from Gallery', onPress: () => handleChooseFromGallery() },
-        { text: 'Upload PDF', onPress: () => handleUploadPDF() },
-        { text: 'Cancel', style: 'cancel' }
+        {
+          text: 'View Medicines',
+          onPress: () => {
+            // Scroll to detected medicines section
+          }
+        },
+        { text: 'OK' }
       ]
     );
   };
 
+  // Legacy handlers for backward compatibility
   const handleTakePhoto = () => {
     // Simulate taking a photo and detecting medicines
     setTimeout(() => {
       const mockDetectedMedicines: DetectedMedicine[] = [
-        { name: 'Lisinopril', dosage: '10mg', frequency: 'Once daily', detected: true },
-        { name: 'Metformin', dosage: '500mg', frequency: 'Twice daily', detected: true },
-        { name: 'Aspirin', dosage: '81mg', frequency: 'Once daily', detected: true }
+        { 
+          id: `medicine_${Date.now()}_1`,
+          name: 'Lisinopril', 
+          dosage: '10mg', 
+          frequency: 'Once daily', 
+          detected: true, 
+          confidence: 0.89,
+          source: 'detected',
+          createdAt: new Date().toISOString()
+        },
+        { 
+          id: `medicine_${Date.now()}_2`,
+          name: 'Metformin', 
+          dosage: '500mg', 
+          frequency: 'Twice daily', 
+          detected: true, 
+          confidence: 0.92,
+          source: 'detected',
+          createdAt: new Date().toISOString()
+        },
+        { 
+          id: `medicine_${Date.now()}_3`,
+          name: 'Aspirin', 
+          dosage: '81mg', 
+          frequency: 'Once daily', 
+          detected: true, 
+          confidence: 0.85,
+          source: 'detected',
+          createdAt: new Date().toISOString()
+        }
       ];
-      setDetectedMedicines(mockDetectedMedicines);
-      setUploadedPrescription({ type: 'photo', timestamp: new Date().toISOString() });
+      setDetectedMedicines(prev => [...prev, ...mockDetectedMedicines]);
+      
+      const uploadedPrescription: UploadedPrescription = {
+        id: `upload_${Date.now()}`,
+        type: 'photo',
+        timestamp: new Date().toISOString(),
+        fileName: `photo_${Date.now()}.jpg`,
+        fileSize: 2048000,
+        uri: `mock://photo_${Date.now()}`,
+        uploadStatus: 'completed'
+      };
+      setUploadedPrescriptions(prev => [...prev, uploadedPrescription]);
+      
       Alert.alert(
         'Prescription Uploaded',
         `Successfully detected ${mockDetectedMedicines.length} medicines from your prescription image.`,
@@ -117,11 +185,40 @@ export default function PrescriptionDetailsScreen() {
     // Simulate choosing from gallery and detecting medicines
     setTimeout(() => {
       const mockDetectedMedicines: DetectedMedicine[] = [
-        { name: 'Atorvastatin', dosage: '20mg', frequency: 'Once daily', detected: true },
-        { name: 'Amlodipine', dosage: '5mg', frequency: 'Once daily', detected: true }
+        { 
+          id: `medicine_${Date.now()}_1`,
+          name: 'Atorvastatin', 
+          dosage: '20mg', 
+          frequency: 'Once daily', 
+          detected: true, 
+          confidence: 0.87,
+          source: 'detected',
+          createdAt: new Date().toISOString()
+        },
+        { 
+          id: `medicine_${Date.now()}_2`,
+          name: 'Amlodipine', 
+          dosage: '5mg', 
+          frequency: 'Once daily', 
+          detected: true, 
+          confidence: 0.91,
+          source: 'detected',
+          createdAt: new Date().toISOString()
+        }
       ];
-      setDetectedMedicines(mockDetectedMedicines);
-      setUploadedPrescription({ type: 'gallery', timestamp: new Date().toISOString() });
+      setDetectedMedicines(prev => [...prev, ...mockDetectedMedicines]);
+      
+      const uploadedPrescription: UploadedPrescription = {
+        id: `upload_${Date.now()}`,
+        type: 'gallery',
+        timestamp: new Date().toISOString(),
+        fileName: `gallery_${Date.now()}.jpg`,
+        fileSize: 1536000,
+        uri: `mock://gallery_${Date.now()}`,
+        uploadStatus: 'completed'
+      };
+      setUploadedPrescriptions(prev => [...prev, uploadedPrescription]);
+      
       Alert.alert(
         'Prescription Uploaded',
         `Successfully detected ${mockDetectedMedicines.length} medicines from your prescription image.`,
@@ -134,12 +231,50 @@ export default function PrescriptionDetailsScreen() {
     // Simulate PDF upload and detecting medicines
     setTimeout(() => {
       const mockDetectedMedicines: DetectedMedicine[] = [
-        { name: 'Omeprazole', dosage: '20mg', frequency: 'Once daily', detected: true },
-        { name: 'Simvastatin', dosage: '40mg', frequency: 'Once daily at bedtime', detected: true },
-        { name: 'Losartan', dosage: '50mg', frequency: 'Once daily', detected: true }
+        { 
+          id: `medicine_${Date.now()}_1`,
+          name: 'Omeprazole', 
+          dosage: '20mg', 
+          frequency: 'Once daily', 
+          detected: true, 
+          confidence: 0.93,
+          source: 'detected',
+          createdAt: new Date().toISOString()
+        },
+        { 
+          id: `medicine_${Date.now()}_2`,
+          name: 'Simvastatin', 
+          dosage: '40mg', 
+          frequency: 'Once daily at bedtime', 
+          detected: true, 
+          confidence: 0.88,
+          source: 'detected',
+          createdAt: new Date().toISOString()
+        },
+        { 
+          id: `medicine_${Date.now()}_3`,
+          name: 'Losartan', 
+          dosage: '50mg', 
+          frequency: 'Once daily', 
+          detected: true, 
+          confidence: 0.90,
+          source: 'detected',
+          createdAt: new Date().toISOString()
+        }
       ];
-      setDetectedMedicines(mockDetectedMedicines);
-      setUploadedPrescription({ type: 'pdf', timestamp: new Date().toISOString() });
+      setDetectedMedicines(prev => [...prev, ...mockDetectedMedicines]);
+      
+      const uploadedPrescription: UploadedPrescription = {
+        id: `upload_${Date.now()}`,
+        type: 'pdf',
+        timestamp: new Date().toISOString(),
+        fileName: `prescription_${Date.now()}.pdf`,
+        fileSize: 512000,
+        uri: `mock://pdf_${Date.now()}`,
+        uploadStatus: 'completed'
+      };
+      setUploadedPrescriptions(prev => [...prev, uploadedPrescription]);
+      
       Alert.alert(
         'Prescription Uploaded',
         `Successfully detected ${mockDetectedMedicines.length} medicines from your prescription PDF.`,
@@ -162,7 +297,6 @@ export default function PrescriptionDetailsScreen() {
     updatePrescription(prescription.id, {
       ...prescription,
       pharmacy: sendDetails.pharmacy.name,
-      // sendDetails,
       status: 'processing'
     });
 
@@ -190,6 +324,41 @@ export default function PrescriptionDetailsScreen() {
         { text: 'Email', onPress: () => console.log('Email') },
         { text: 'SMS', onPress: () => console.log('SMS') },
         { text: 'Cancel', style: 'cancel' }
+      ]
+    );
+  };
+
+  // New handlers for enhanced functionality
+  const handleDeleteUploadedPrescription = (index: number) => {
+    Alert.alert(
+      'Delete Upload',
+      'Are you sure you want to remove this uploaded prescription?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            setUploadedPrescriptions(prev => prev.filter((_, i) => i !== index));
+          }
+        }
+      ]
+    );
+  };
+
+  const handleRemoveDetectedMedicine = (medicineIndex: number) => {
+    Alert.alert(
+      'Remove Medicine',
+      'Are you sure you want to remove this detected medicine?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => {
+            setDetectedMedicines(prev => prev.filter((_, i) => i !== medicineIndex));
+          }
+        }
       ]
     );
   };
@@ -280,6 +449,41 @@ export default function PrescriptionDetailsScreen() {
             </View>
           </View>
 
+          {/* NEW: Uploaded Prescriptions Section */}
+          {uploadedPrescriptions.length > 0 && (
+            <View style={styles.uploadedPrescriptionsCard}>
+              <View style={styles.uploadedHeader}>
+                <Upload size={20} color={COLORS.primary} />
+                <Text style={styles.uploadedTitle}>Uploaded Prescriptions</Text>
+              </View>
+              
+              {uploadedPrescriptions.map((upload, index) => (
+                <View key={index} style={styles.uploadedItem}>
+                  <View style={styles.uploadedItemContent}>
+                    <View style={styles.uploadedItemInfo}>
+                      <Text style={styles.uploadedFileName}>{upload.fileName}</Text>
+                      <Text style={styles.uploadedTimestamp}>
+                        Uploaded {new Date(upload.timestamp).toLocaleDateString()}
+                      </Text>
+                      <View style={styles.uploadedMeta}>
+                        <Text style={styles.uploadedType}>{upload.type.toUpperCase()}</Text>
+                        <Text style={styles.uploadedSize}>
+                          {(upload.fileSize / 1024).toFixed(1)} KB
+                        </Text>
+                      </View>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.deleteUploadButton}
+                      onPress={() => handleDeleteUploadedPrescription(index)}
+                    >
+                      <X size={16} color={COLORS.error} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+
           {/* Medications or Actions */}
           {prescription.status === 'completed' ? (
             <View style={styles.medicationsCard}>
@@ -310,54 +514,6 @@ export default function PrescriptionDetailsScreen() {
                         {medication.instructions}
                       </Text>
                     )}
-
-                    {/* Detected Medicines from Upload */}
-                    {detectedMedicines.length > 0 && (
-                      <View style={styles.detectedMedicinesCard}>
-                        <View style={styles.detectedMedicinesHeader}>
-                          <CheckCircle size={20} color={COLORS.success} />
-                          <Text style={styles.detectedMedicinesTitle}>Detected Medicines</Text>
-                        </View>
-                        <Text style={styles.detectedMedicinesSubtitle}>
-                          Found {detectedMedicines.length} medicine(s) from your uploaded prescription
-                        </Text>
-
-                        {detectedMedicines.map((medicine: DetectedMedicine, index: number) => (
-                          <View key={index} style={styles.detectedMedicineItem}>
-                            <View style={styles.detectedMedicineHeader}>
-                              <View style={styles.detectedMedicineTitleContainer}>
-                                <Pill size={18} color={COLORS.success} />
-                                <Text style={styles.detectedMedicineName}>{medicine.name}</Text>
-                              </View>
-                              <View style={styles.detectedBadge}>
-                                <Text style={styles.detectedBadgeText}>Detected</Text>
-                              </View>
-                            </View>
-
-                            <View style={styles.detectedMedicineDetails}>
-                              <Text style={styles.detectedMedicineDetail}>
-                                <Text style={styles.detectedDetailLabel}>Dosage: </Text>
-                                {medicine.dosage}
-                              </Text>
-                              <Text style={styles.detectedMedicineDetail}>
-                                <Text style={styles.detectedDetailLabel}>Frequency: </Text>
-                                {medicine.frequency}
-                              </Text>
-                            </View>
-                          </View>
-                        ))}
-
-                        <TouchableOpacity
-                          style={styles.findPharmaciesForDetectedButton}
-                          onPress={() => setShowPharmacies(true)}
-                        >
-                          <MapPin size={18} color={COLORS.white} />
-                          <Text style={styles.findPharmaciesForDetectedButtonText}>
-                            Find Pharmacies for These Medicines
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    )}
                   </View>
                 </View>
               ))}
@@ -383,6 +539,72 @@ export default function PrescriptionDetailsScreen() {
               >
                 <MapPin size={20} color={COLORS.primary} />
                 <Text style={styles.actionButtonText}>Find Pharmacies</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* ENHANCED: Detected Medicines from Uploads */}
+          {detectedMedicines.length > 0 && (
+            <View style={styles.detectedMedicinesCard}>
+              <View style={styles.detectedMedicinesHeader}>
+                <CheckCircle size={20} color={COLORS.success} />
+                <Text style={styles.detectedMedicinesTitle}>Detected Medicines</Text>
+              </View>
+              <Text style={styles.detectedMedicinesSubtitle}>
+                Found {detectedMedicines.length} medicine(s) from your uploaded prescriptions
+              </Text>
+
+              {detectedMedicines.map((medicine: DetectedMedicine, index: number) => (
+                <View key={index} style={styles.detectedMedicineItem}>
+                  <View style={styles.detectedMedicineHeader}>
+                    <View style={styles.detectedMedicineTitleContainer}>
+                      <Pill size={18} color={COLORS.success} />
+                      <Text style={styles.detectedMedicineName}>{medicine.name}</Text>
+                    </View>
+                    <View style={styles.detectedMedicineActions}>
+                      {medicine.confidence && (
+                        <View style={styles.detectedBadge}>
+                          <Text style={styles.detectedBadgeText}>
+                            {Math.round(medicine.confidence * 100)}%
+                          </Text>
+                        </View>
+                      )}
+                      <TouchableOpacity
+                        style={styles.removeMedicineButton}
+                        onPress={() => handleRemoveDetectedMedicine(index)}
+                      >
+                        <X size={16} color={COLORS.error} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  <View style={styles.detectedMedicineDetails}>
+                    <Text style={styles.detectedMedicineDetail}>
+                      <Text style={styles.detectedDetailLabel}>Dosage: </Text>
+                      {medicine.dosage}
+                    </Text>
+                    <Text style={styles.detectedMedicineDetail}>
+                      <Text style={styles.detectedDetailLabel}>Frequency: </Text>
+                      {medicine.frequency}
+                    </Text>
+                    {medicine.notes && (
+                      <Text style={styles.detectedMedicineDetail}>
+                        <Text style={styles.detectedDetailLabel}>Notes: </Text>
+                        {medicine.notes}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              ))}
+
+              <TouchableOpacity
+                style={styles.findPharmaciesForDetectedButton}
+                onPress={() => setShowPharmacies(true)}
+              >
+                <MapPin size={18} color={COLORS.white} />
+                <Text style={styles.findPharmaciesForDetectedButtonText}>
+                  Find Pharmacies for These Medicines
+                </Text>
               </TouchableOpacity>
             </View>
           )}
@@ -447,6 +669,14 @@ export default function PrescriptionDetailsScreen() {
         )
       )}
 
+      {/* NEW: Upload Prescription Modal */}
+      <UploadPrescriptionModal
+        visible={showUploadModal}
+        onClose={() => setShowUploadModal(false)}
+        onUploadComplete={handleUploadComplete}
+        prescriptionId={prescription.id}
+      />
+
       {/* Send Prescription Modal */}
       <SendPrescriptionModal
         visible={showSendModal}
@@ -474,15 +704,18 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
     backgroundColor: COLORS.white,
+    position: 'relative',
   },
   backButton: {
+    position: 'absolute',
+    left: 12,
     width: 40,
     height: 40,
     justifyContent: 'center',
@@ -492,10 +725,12 @@ const styles = StyleSheet.create({
     fontSize: SIZES.lg,
     fontWeight: '600',
     color: COLORS.textPrimary,
-    justifyContent: 'center',
-    alignItems: 'center',
+    textAlign: 'center',
+    // justifyContent: 'center',
+    // alignItems: 'center',
   },
   viewToggle: {
+    left: 60,
     flexDirection: 'row',
     backgroundColor: COLORS.veryLightGray,
     borderRadius: 20,
@@ -570,6 +805,73 @@ const styles = StyleSheet.create({
   infoValue: {
     fontSize: SIZES.md,
     color: COLORS.textPrimary,
+  },
+  // NEW: Uploaded Prescriptions Styles
+  uploadedPrescriptionsCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    ...SHADOWS.small,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.primary,
+  },
+  uploadedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  uploadedTitle: {
+    fontSize: SIZES.md,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    marginLeft: 8,
+  },
+  uploadedItem: {
+    marginBottom: 12,
+  },
+  uploadedItemContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: COLORS.veryLightGray,
+    padding: 12,
+    borderRadius: 8,
+  },
+  uploadedItemInfo: {
+    flex: 1,
+  },
+  uploadedFileName: {
+    fontSize: SIZES.sm,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    marginBottom: 4,
+  },
+  uploadedTimestamp: {
+    fontSize: SIZES.xs,
+    color: COLORS.textSecondary,
+    marginBottom: 4,
+  },
+  uploadedMeta: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  uploadedType: {
+    fontSize: SIZES.xs,
+    fontWeight: '600',
+    color: COLORS.primary,
+  },
+  uploadedSize: {
+    fontSize: SIZES.xs,
+    color: COLORS.textSecondary,
+  },
+  deleteUploadButton: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.error + '20',
+    borderRadius: 16,
   },
   medicationsCard: {
     backgroundColor: COLORS.white,
@@ -794,6 +1096,12 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     marginLeft: 8,
   },
+  // ENHANCED: Detected Medicine Actions
+  detectedMedicineActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   detectedBadge: {
     backgroundColor: 'rgba(76, 175, 80, 0.1)',
     paddingHorizontal: 8,
@@ -804,6 +1112,14 @@ const styles = StyleSheet.create({
     fontSize: SIZES.xs,
     color: COLORS.success,
     fontWeight: '600',
+  },
+  removeMedicineButton: {
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.error + '20',
+    borderRadius: 12,
   },
   detectedMedicineDetails: {
     marginLeft: 26,
