@@ -3,116 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthState, LoginCredentials, RegisterData, ResetPasswordData, NewPasswordData, User, UserRole } from '../types/auth';
 import { Language } from './languageStore';
-
-// Mock API functions (replace with actual API calls)
-const mockLogin = async (credentials: LoginCredentials): Promise<{ user: User; token: string }> => {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  
-  // Mock users for different roles with role-specific data
-  const users: Record<string, User> = {
-    'patient@example.com': {
-      id: 'p1',
-      email: 'patient@example.com',
-      firstName: 'John',
-      lastName: 'Doe',
-      role: 'patient' as UserRole,
-      profileImage: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?q=80&w=987&auto=format&fit=crop',
-      language: 'en'
-    },
-    'doctor@example.com': {
-      id: 'd1',
-      email: 'doctor@example.com',
-      firstName: 'Sarah',
-      lastName: 'Johnson',
-      role: 'doctor' as UserRole,
-      profileImage: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?q=80&w=2070&auto=format&fit=crop',
-      specialization: 'Internal Medicine',
-      licenseNumber: 'MD123456',
-      hospitalAffiliation: 'City General Hospital',
-      language: 'en'
-    },
-    'pharmacist@example.com': {
-      id: 'ph1',
-      email: 'pharmacist@example.com',
-      firstName: 'Michael',
-      lastName: 'Chen',
-      role: 'pharmacist' as UserRole,
-      profileImage: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?q=80&w=1964&auto=format&fit=crop',
-      licenseNumber: 'PH789012',
-      pharmacyAffiliation: 'HealthCare Pharmacy',
-      language: 'en'
-    }
-  };
-  
-  const user = users[credentials.email];
-  
-  if (!user || credentials.password !== 'password123') {
-    throw new Error('Invalid email or password');
-  }
-  
-  return {
-    user,
-    token: 'mock-jwt-token-' + user.role
-  };
-};
-
-const mockRegister = async (data: RegisterData): Promise<{ user: User; token: string }> => {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 1500));
-  
-  // In a real app, this would create a new user in the database
-  const user: User = {
-    id: 'new-' + Math.random().toString(36).substring(2, 9),
-    email: data.email,
-    firstName: data.firstName,
-    lastName: data.lastName,
-    role: data.role,
-    profileImage: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=1780&auto=format&fit=crop',
-    language: 'en'
-  };
-  
-  // Add role-specific default data
-  if (data.role === 'doctor') {
-    user.specialization = 'General Practice';
-    user.hospitalAffiliation = 'General Hospital';
-  } else if (data.role === 'pharmacist') {
-    user.pharmacyAffiliation = 'Community Pharmacy';
-  }
-  
-  return {
-    user,
-    token: 'mock-jwt-token-' + user.role
-  };
-};
-
-const mockResetPassword = async (data: ResetPasswordData): Promise<void> => {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  
-  // In a real app, this would send a reset email
-  if (data.email.includes('@')) {
-    return;
-  }
-  
-  throw new Error('Invalid email address');
-};
-
-const mockSetNewPassword = async (data: NewPasswordData): Promise<void> => {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  
-  // In a real app, this would update the password in the database
-  if (data.password !== data.confirmPassword) {
-    throw new Error('Passwords do not match');
-  }
-  
-  if (data.password.length < 8) {
-    throw new Error('Password must be at least 8 characters');
-  }
-  
-  return;
-};
+import { authService } from '../services/authService';
 
 interface AuthStore extends AuthState {
   login: (credentials: LoginCredentials) => Promise<void>;
@@ -143,9 +34,20 @@ export const useAuthStore = create<AuthStore>()(
       login: async (credentials) => {
         set({ isLoading: true, error: null });
         try {
-          const { user, token } = await mockLogin(credentials);
-          set({ user, token, isLoading: false });
+          console.log('Auth Store: Starting login process...');
+          const authResponse = await authService.login(credentials);
+          console.log('Auth Store: Login response received:', {
+            user: authResponse.user ? { id: authResponse.user.id, role: authResponse.user.role } : null,
+            hasToken: !!authResponse.accessToken
+          });
+          set({ 
+            user: authResponse.user, 
+            token: authResponse.accessToken, 
+            isLoading: false 
+          });
+          console.log('Auth Store: State updated successfully');
         } catch (error) {
+          console.error('Auth Store: Login error:', error);
           set({ 
             isLoading: false, 
             error: error instanceof Error ? error.message : 'An unknown error occurred' 
@@ -156,8 +58,12 @@ export const useAuthStore = create<AuthStore>()(
       register: async (data) => {
         set({ isLoading: true, error: null });
         try {
-          const { user, token } = await mockRegister(data);
-          set({ user, token, isLoading: false });
+          const authResponse = await authService.register(data);
+          set({ 
+            user: authResponse.user, 
+            token: authResponse.accessToken, 
+            isLoading: false 
+          });
           return Promise.resolve();
         } catch (error) {
           set({ 
@@ -170,6 +76,9 @@ export const useAuthStore = create<AuthStore>()(
       
       logout: async () => {
         try {
+          // Call backend logout
+          await authService.logout();
+          
           // Clear all auth data
           set({ user: null, token: null, error: null, isLoading: false });
           
@@ -188,7 +97,7 @@ export const useAuthStore = create<AuthStore>()(
       resetPassword: async (data) => {
         set({ isLoading: true, error: null });
         try {
-          await mockResetPassword(data);
+          await authService.forgotPassword(data.email);
           set({ isLoading: false });
         } catch (error) {
           set({ 
@@ -201,7 +110,10 @@ export const useAuthStore = create<AuthStore>()(
       setNewPassword: async (data) => {
         set({ isLoading: true, error: null });
         try {
-          await mockSetNewPassword(data);
+          if (data.password !== data.confirmPassword) {
+            throw new Error('Passwords do not match');
+          }
+          await authService.resetPassword(data.token, data.password);
           set({ isLoading: false });
         } catch (error) {
           set({ 
@@ -211,14 +123,24 @@ export const useAuthStore = create<AuthStore>()(
         }
       },
 
-      updateUser: (updatedUser) => {
-        set({ user: updatedUser });
+      updateUser: async (updatedUser) => {
+        try {
+          const updated = await authService.updateProfile(updatedUser);
+          set({ user: updated });
+        } catch (error) {
+          console.error('Update user error:', error);
+        }
       },
       
-      updateLanguage: (language) => {
-        const { user } = get();
-        if (user) {
-          set({ user: { ...user, language } });
+      updateLanguage: async (language) => {
+        try {
+          await authService.updateLanguage(language);
+          const { user } = get();
+          if (user) {
+            set({ user: { ...user, language } });
+          }
+        } catch (error) {
+          console.error('Update language error:', error);
         }
       },
       
@@ -229,24 +151,24 @@ export const useAuthStore = create<AuthStore>()(
       // Role-based helpers
       isPatient: () => {
         const { user } = get();
-        return user?.role === 'patient';
+        return user?.role?.toLowerCase() === 'patient';
       },
 
       isDoctor: () => {
         const { user } = get();
-        return user?.role === 'doctor';
+        return user?.role?.toLowerCase() === 'doctor';
       },
 
       isPharmacist: () => {
         const { user } = get();
-        return user?.role === 'pharmacist';
+        return user?.role?.toLowerCase() === 'pharmacist';
       },
 
       getUserDisplayName: () => {
         const { user } = get();
         if (!user) return '';
         
-        if (user.role === 'doctor') {
+        if (user.role?.toLowerCase() === 'doctor') {
           return `Dr. ${user.firstName} ${user.lastName}`;
         }
         return `${user.firstName} ${user.lastName}`;

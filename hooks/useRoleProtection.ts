@@ -10,7 +10,7 @@ export function useRoleProtection(allowedRoles: UserRole[]) {
 
   useEffect(() => {
     const inAuthGroup = segments[0] === "(auth)";
-    const currentRole = user?.role;
+    const currentRole = user?.role?.toLowerCase();
 
     if (!token && !inAuthGroup) {
       // Not authenticated, redirect to login
@@ -26,12 +26,12 @@ export function useRoleProtection(allowedRoles: UserRole[]) {
       return;
     }
 
-    if (token && currentRole && !allowedRoles.includes(currentRole)) {
+    if (token && currentRole && !allowedRoles.includes(currentRole as UserRole)) {
       // User's role doesn't match allowed roles for this route
       router.replace(`/(${currentRole})`);
       return;
     }
   }, [token, segments, user?.role]);
 
-  return { isAuthorized: token && user?.role && allowedRoles.includes(user.role) };
+  return { isAuthorized: token && user?.role && allowedRoles.includes(user.role.toLowerCase() as UserRole) };
 } 

@@ -4,6 +4,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from 'react-native';
 import { useEffect } from "react";
 import { useAuthStore } from "../store/authStore";
+import { useSocket } from "../hooks/useSocket";
 import ErrorBoundary from "./error-boundary";
 import { COLORS } from "./constants/theme";
 
@@ -24,6 +25,9 @@ export default function RootLayout() {
   const { token, user } = useAuthStore();
   const segments = useSegments();
   const router = useRouter();
+  
+  // Initialize socket connection for authenticated users
+  useSocket();
 
   // Handle authentication state changes
   useEffect(() => {
@@ -31,18 +35,29 @@ export default function RootLayout() {
 
     const inAuthGroup = segments[0] === "(auth)";
     
+    console.log('Navigation Debug:', {
+      token: !!token,
+      user: user ? { id: user.id, role: user.role } : null,
+      inAuthGroup,
+      segments,
+      loaded
+    });
+    
     // If user is authenticated and in auth group, redirect to appropriate dashboard
     if (token && user && inAuthGroup) {
-      if (user.role === 'patient') {
+      console.log('Redirecting authenticated user:', user.role);
+      const userRole = user.role.toLowerCase();
+      if (userRole === 'patient') {
         router.replace("/(patient)");
-      } else if (user.role === 'doctor') {
+      } else if (userRole === 'doctor') {
         router.replace("/(doctor)");
-      } else if (user.role === 'pharmacist') {
+      } else if (userRole === 'pharmacist') {
         router.replace("/(pharmacist)");
       }
     } 
     // If user is not authenticated and not in auth group, redirect to auth
     else if (!token && !inAuthGroup) {
+      console.log('Redirecting unauthenticated user to auth');
       router.replace("/(auth)");
     }
     // If user is not authenticated but still in auth group, that's fine
