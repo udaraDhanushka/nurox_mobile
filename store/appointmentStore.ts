@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { Hospital, TokenSlot, AppointmentType } from '../types/appointment';
+import { appointmentService } from '../services/appointmentService';
 
 export type AppointmentStatus = 'pending' | 'confirmed' | 'cancelled' | 'completed';
 
@@ -28,6 +29,7 @@ interface AppointmentState {
   appointments: Appointment[];
   hospitals: Hospital[];
   appointmentTypes: AppointmentType[];
+  isLoading: boolean;
   addAppointment: (appointment: Appointment) => void;
   updateAppointment: (id: string, updates: Partial<Appointment>) => void;
   cancelAppointment: (id: string) => void;
@@ -35,6 +37,8 @@ interface AppointmentState {
   getHospitalsByDoctorId: (doctorId: string) => Hospital[];
   getTokenAvailability: (doctorId: string, hospitalId: string, date: string) => TokenSlot[];
   getAppointmentTypes: () => AppointmentType[];
+  loadAppointmentsFromAPI: () => Promise<void>;
+  syncAppointmentWithAPI: (id: string) => Promise<void>;
 }
 
 // Available appointment types
@@ -107,6 +111,7 @@ const generateEstimatedTime = (tokenNumber: number): string => {
 export const useAppointmentStore = create<AppointmentState>((set, get) => ({
   hospitals: mockHospitals,
   appointmentTypes,
+  isLoading: false,
   
   appointments: [
     {
@@ -237,5 +242,70 @@ export const useAppointmentStore = create<AppointmentState>((set, get) => ({
 
   getAppointmentTypes: () => {
     return appointmentTypes;
+  },
+
+  loadAppointmentsFromAPI: async () => {
+    try {
+      set({ isLoading: true });
+      const response = await appointmentService.getAppointments();
+      
+      if (response.appointments) {
+        // Transform API appointments to local format
+        const transformedAppointments = response.appointments.map(apiAppointment => ({
+          id: apiAppointment.id,
+          doctorId: apiAppointment.doctor?.id || '',
+          doctorName: apiAppointment.doctor ? `${apiAppointment.doctor.firstName} ${apiAppointment.doctor.lastName}` : 'Unknown Doctor',
+          specialty: apiAppointment.doctor?.doctorProfile?.specialization || 'General Practice',
+          hospitalId: 'h1', // Default hospital
+          hospitalName: 'General Hospital',
+          hospitalAddress: apiAppointment.location || 'Hospital Address',
+          date: new Date(apiAppointment.appointmentDate).toISOString().split('T')[0],
+          tokenNumber: Math.floor(Math.random() * 30) + 1, // Generate random token for UI
+          estimatedTime: new Date(apiAppointment.appointmentDate).toLocaleTimeString('en-US', { 
+            hour: 'numeric', 
+            minute: '2-digit', 
+            hour12: true 
+          }),
+          duration: `${apiAppointment.duration || 30} min`,
+          status: apiAppointment.status.toLowerCase() as AppointmentStatus,
+          type: apiAppointment.type.toLowerCase().replace(/_/g, ' ').replace(/\\b\\w/g, l => l.toUpperCase()) as AppointmentType,
+          notes: apiAppointment.notes || '',
+          doctorImage: apiAppointment.doctor?.profileImage || 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?q=80&w=2070&auto=format&fit=crop',
+          rating: apiAppointment.doctor?.doctorProfile?.rating || 4.8,
+          experience: apiAppointment.doctor?.doctorProfile?.experience ? `${apiAppointment.doctor.doctorProfile.experience} years` : '5 years'
+        }));
+        
+        set({ appointments: transformedAppointments });
+      }
+    } catch (error) {
+      console.error('Failed to load appointments from API:', error);
+      // Keep existing local appointments as fallback
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  syncAppointmentWithAPI: async (id: string) => {
+    try {
+      const apiAppointment = await appointmentService.getAppointment(id);
+      const state = get();
+      
+      // Update the specific appointment with API data
+      const updatedAppointments = state.appointments.map(appointment => {
+        if (appointment.id === id) {
+          return {
+            ...appointment,
+            status: apiAppointment.status.toLowerCase() as AppointmentStatus,
+            notes: apiAppointment.notes || appointment.notes,
+            // Update other fields as needed
+          };
+        }
+        return appointment;
+      });
+      
+      set({ appointments: updatedAppointments });
+    } catch (error) {
+      console.error(`Failed to sync appointment ${id} with API:`, error);
+    }
   }
 }));

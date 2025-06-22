@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, TextInput, Alert, TouchableWithoutFeedback } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Calendar, Clock, MapPin, User, FileText, ChevronDown, Building } from 'lucide-react-native';
+import { ArrowLeft, Calendar, Clock, MapPin, User, FileText, ChevronDown, Building, Search, Filter } from 'lucide-react-native';
 import { COLORS, SIZES, SHADOWS } from '../../../constants/theme';
 import { Button } from '../../../components/Button';
 import { DatePickerModal } from '../../../components/ui/DatePickerModal';
 import { useAppointmentStore } from '../../../store/appointmentStore';
 import { Hospital, TokenSlot, AppointmentType } from '../../../types/appointment';
+import { appointmentService } from '../../../services/appointmentService';
+import { useAuthStore } from '../../../store/authStore';
 
 const mockDoctors = [
   {
@@ -46,9 +48,26 @@ const appointmentTypes: AppointmentType[] = [
   'Vaccination'
 ];
 
+// Common specializations for filtering
+const specializations = [
+  'All Specializations',
+  'Cardiologist',
+  'Dermatologist', 
+  'Pediatrician',
+  'Orthopedic',
+  'Neurologist',
+  'General Practice',
+  'Psychiatrist',
+  'Ophthalmologist',
+  'ENT Specialist',
+  'Radiologist',
+  'Anesthesiologist'
+];
+
 export default function NewAppointmentScreen() {
   const router = useRouter();
   const { addAppointment, getHospitalsByDoctorId, getTokenAvailability } = useAppointmentStore();
+  const { user } = useAuthStore();
   
   const [selectedDoctor, setSelectedDoctor] = useState<typeof mockDoctors[0] | null>(null);
   const [availableHospitals, setAvailableHospitals] = useState<Hospital[]>([]);
@@ -61,6 +80,13 @@ export default function NewAppointmentScreen() {
   const [currentStep, setCurrentStep] = useState(1);
   const [showHospitalDropdown, setShowHospitalDropdown] = useState(false);
   const [showDatePickerModal, setShowDatePickerModal] = useState(false);
+  const [isBooking, setIsBooking] = useState(false);
+  const [apiDoctors, setApiDoctors] = useState([]);
+  const [isLoadingDoctors, setIsLoadingDoctors] = useState(false);
+  const [doctorNameFilter, setDoctorNameFilter] = useState('');
+  const [selectedSpecialization, setSelectedSpecialization] = useState('');
+  const [showSpecializationDropdown, setShowSpecializationDropdown] = useState(false);
+  const [allDoctors, setAllDoctors] = useState([]); // Store all doctors for filtering
 
   // Get current date in local timezone (Sri Lankan if device is set correctly)
   const getCurrentDate = () => {
@@ -86,12 +112,46 @@ export default function NewAppointmentScreen() {
     setCurrentStep(1);
     setShowHospitalDropdown(false);
     setShowDatePickerModal(false);
+    setDoctorNameFilter('');
+    setSelectedSpecialization('');
+    setShowSpecializationDropdown(false);
   }, []);
 
-  // Initialize current date
+  // Initialize current date and load doctors
   useEffect(() => {
     setSelectedDate(getCurrentDate());
+    loadDoctorsFromAPI();
   }, []);
+
+  // Load doctors from API
+  const loadDoctorsFromAPI = async () => {
+    try {
+      setIsLoadingDoctors(true);
+      const response = await appointmentService.getDoctors();
+      if (response.doctors && response.doctors.length > 0) {
+        // Transform API doctors to match expected format
+        const transformedDoctors = response.doctors.map(doctor => ({
+          id: doctor.id,
+          name: `${doctor.firstName} ${doctor.lastName}`,
+          specialty: doctor.doctorProfile?.specialization || 'General Practice',
+          image: doctor.profileImage || 'https://images.unsplash.com/photo-612349317150-e413f6a5b16d?q=80&w=2070&auto=format&fit=crop',
+          rating: doctor.doctorProfile?.rating || 4.8,
+          experience: doctor.doctorProfile?.experience ? `${doctor.doctorProfile.experience} years` : '5 years'
+        }));
+        setApiDoctors(transformedDoctors);
+        setAllDoctors(transformedDoctors);
+      } else {
+        // Use mock doctors as fallback
+        setAllDoctors(mockDoctors);
+      }
+    } catch (error) {
+      console.log('Failed to load doctors from API, using fallback data:', error);
+      // Keep using mock doctors as fallback
+      setAllDoctors(mockDoctors);
+    } finally {
+      setIsLoadingDoctors(false);
+    }
+  };
 
   // Reset form when navigating back using useFocusEffect
   useFocusEffect(
@@ -134,6 +194,38 @@ export default function NewAppointmentScreen() {
       setSelectedToken(null);
     }
   }, [selectedDoctor, selectedHospital, selectedDate]);
+
+  // Filter doctors based on name and specialization
+  const filteredDoctors = React.useMemo(() => {
+    let doctors = allDoctors.length > 0 ? allDoctors : mockDoctors;
+    
+    // Filter by name
+    if (doctorNameFilter.trim()) {
+      doctors = doctors.filter(doctor => 
+        doctor.name.toLowerCase().includes(doctorNameFilter.toLowerCase())
+      );
+    }
+    
+    // Filter by specialization
+    if (selectedSpecialization && selectedSpecialization !== 'All Specializations') {
+      doctors = doctors.filter(doctor => 
+        doctor.specialty.toLowerCase() === selectedSpecialization.toLowerCase()
+      );
+    }
+    
+    return doctors;
+  }, [allDoctors, doctorNameFilter, selectedSpecialization]);
+
+  // Clear doctor selection when filters change
+  useEffect(() => {
+    if (selectedDoctor && !filteredDoctors.find(d => d.id === selectedDoctor.id)) {
+      setSelectedDoctor(null);
+      setAvailableHospitals([]);
+      setSelectedHospital(null);
+      setAvailableTokens([]);
+      setSelectedToken(null);
+    }
+  }, [filteredDoctors, selectedDoctor]);
 
   // Generate mock tokens if store doesn't return any
   const generateFallbackTokens = (): TokenSlot[] => {
@@ -188,62 +280,125 @@ export default function NewAppointmentScreen() {
     }
   };
 
-  const handleBookAppointment = () => {
+  const handleBookAppointment = async () => {
     if (!selectedDoctor || !selectedHospital || !selectedToken || !selectedType) {
-      Alert.alert('Please fill in all required fields');
+      Alert.alert('Error', 'Please fill in all required fields');
       return;
     }
 
-    const newAppointment = {
-      id: Math.random().toString(36).substring(2, 9),
-      doctorId: selectedDoctor.id,
-      doctorName: selectedDoctor.name,
-      doctorImage: selectedDoctor.image,
-      specialty: selectedDoctor.specialty,
-      rating: selectedDoctor.rating,
-      experience: selectedDoctor.experience,
-      hospitalId: selectedHospital.id,
-      hospitalName: selectedHospital.name,
-      hospitalAddress: selectedHospital.address,
-      date: selectedDate,
-      tokenNumber: selectedToken.tokenNumber,
-      estimatedTime: selectedToken.time,
-      duration: '30 min',
-      type: selectedType as AppointmentType,
-      status: 'pending' as const,
-      paymentId: undefined,
-      notes
-      
-    };
+    if (!user?.id) {
+      Alert.alert('Error', 'User not authenticated. Please log in again.');
+      return;
+    }
 
-    // Store appointment temporarily (in real app, you might use a different approach)
-    addAppointment(newAppointment);
-    
-    Alert.alert(
-      'Appointment Confirmed! 🎉',
-      `Your appointment has been scheduled:\n\nDoctor: ${selectedDoctor.name}\nDate: ${selectedDate}\nToken: #${selectedToken.tokenNumber}\nTime: ${selectedToken.time}\n\nProceed to payment to complete your booking.`,
-      [
-        {
-          text: 'Proceed to Payment',
-          onPress: () => {
-            resetForm();
-            // Navigate to payment screen with appointment details
-            router.push({
-              pathname: '/(patient)/payments',
-              params: {
-                appointmentId: newAppointment.id,
-                doctorName: selectedDoctor.name,
-                specialty: selectedDoctor.specialty,
-                hospitalName: selectedHospital.name,
-                date: selectedDate,
-                time: selectedToken.time,
-                tokenNumber: selectedToken.tokenNumber
-              }
-            });
-          }
+    setIsBooking(true);
+
+    try {
+      // Convert 12-hour time format to 24-hour format and create proper ISO string
+      const convertTo24Hour = (time12h: string) => {
+        const [time, modifier] = time12h.split(' ');
+        let [hours, minutes] = time.split(':').map(num => parseInt(num));
+        
+        if (modifier === 'PM' && hours !== 12) {
+          hours += 12;
+        } else if (modifier === 'AM' && hours === 12) {
+          hours = 0;
         }
-      ]
-    );
+        
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+      };
+
+      const time24 = convertTo24Hour(selectedToken.time);
+      const appointmentDateTime = `${selectedDate}T${time24}:00.000Z`;
+      
+      console.log('Debug appointment date conversion:');
+      console.log('selectedDate:', selectedDate);
+      console.log('selectedToken.time:', selectedToken.time);
+      console.log('time24:', time24);
+      console.log('appointmentDateTime:', appointmentDateTime);
+      console.log('Date validation:', new Date(appointmentDateTime).toString());
+      
+      // Prepare API request data - only include notes if it has content
+      const appointmentData = {
+        doctorId: selectedDoctor.id,
+        type: selectedType.toUpperCase().replace(/\s+/g, '_') as any, // Transform to match backend enum
+        title: `${selectedType} with ${selectedDoctor.name}`,
+        description: notes || `${selectedType} appointment`,
+        appointmentDate: appointmentDateTime,
+        duration: 30, // Default 30 minutes
+        isVirtual: false,
+        ...(notes && notes.trim() && { notes: notes.trim() }) // Only include notes if it has actual content
+      };
+
+      console.log('Creating appointment with data:', appointmentData);
+      
+      // Call API to create appointment
+      const createdAppointment = await appointmentService.createAppointment(appointmentData);
+      
+      console.log('Appointment created successfully:', createdAppointment);
+
+      // Create local appointment object for immediate UI update
+      const localAppointment = {
+        id: createdAppointment.id,
+        doctorId: selectedDoctor.id,
+        doctorName: selectedDoctor.name,
+        doctorImage: selectedDoctor.image,
+        specialty: selectedDoctor.specialty,
+        rating: selectedDoctor.rating,
+        experience: selectedDoctor.experience,
+        hospitalId: selectedHospital.id,
+        hospitalName: selectedHospital.name,
+        hospitalAddress: selectedHospital.address,
+        date: selectedDate,
+        tokenNumber: selectedToken.tokenNumber,
+        estimatedTime: selectedToken.time,
+        duration: '30 min',
+        type: selectedType as AppointmentType,
+        status: 'pending' as const,
+        paymentId: undefined,
+        notes
+      };
+
+      // Add to local store for immediate UI feedback
+      addAppointment(localAppointment);
+      
+      Alert.alert(
+        'Appointment Confirmed! 🎉',
+        `Your appointment has been scheduled:\n\nDoctor: ${selectedDoctor.name}\nDate: ${selectedDate}\nToken: #${selectedToken.tokenNumber}\nTime: ${selectedToken.time}\n\nProceed to payment to complete your booking.`,
+        [
+          {
+            text: 'Proceed to Payment',
+            onPress: () => {
+              resetForm();
+              // Navigate to payment screen with appointment details
+              router.push({
+                pathname: '/(patient)/payments',
+                params: {
+                  appointmentId: createdAppointment.id,
+                  doctorName: selectedDoctor.name,
+                  specialty: selectedDoctor.specialty,
+                  hospitalName: selectedHospital.name,
+                  date: selectedDate,
+                  time: selectedToken.time,
+                  tokenNumber: selectedToken.tokenNumber
+                }
+              });
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Failed to create appointment:', error);
+      Alert.alert(
+        'Booking Failed',
+        'Failed to book appointment. Please try again.',
+        [
+          { text: 'OK' }
+        ]
+      );
+    } finally {
+      setIsBooking(false);
+    }
   };
 
   const renderStepIndicator = () => (
@@ -277,29 +432,130 @@ export default function NewAppointmentScreen() {
       <Text style={styles.stepTitle}>Select Doctor</Text>
       <Text style={styles.stepSubtitle}>Choose a doctor for your appointment</Text>
       
-      {mockDoctors.map((doctor) => (
+      {/* Filter Section */}
+      <View style={styles.filterSection}>
+        {/* Name Search Filter */}
+        <View style={styles.searchContainer}>
+          <Search size={20} color={COLORS.textSecondary} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search doctor by name..."
+            placeholderTextColor={COLORS.textSecondary}
+            value={doctorNameFilter}
+            onChangeText={setDoctorNameFilter}
+          />
+        </View>
+
+        {/* Specialization Filter */}
         <TouchableOpacity
-          key={doctor.id}
           style={[
-            styles.doctorCard,
-            selectedDoctor?.id === doctor.id && styles.selectedDoctorCard
+            styles.filterDropdownButton,
+            showSpecializationDropdown && styles.activeDropdownButton
           ]}
-          onPress={() => setSelectedDoctor(doctor)}
+          onPress={() => setShowSpecializationDropdown(!showSpecializationDropdown)}
         >
-          <View style={styles.doctorInfo}>
-            <Text style={styles.doctorName}>{doctor.name}</Text>
-            <Text style={styles.doctorSpecialty}>{doctor.specialty}</Text>
-            <Text style={styles.doctorDetails}>
-              ⭐ {doctor.rating} • {doctor.experience}
-            </Text>
-          </View>
-          {selectedDoctor?.id === doctor.id && (
-            <View style={styles.selectedIndicator}>
-              <Text style={styles.selectedText}>✓</Text>
-            </View>
-          )}
+          <Filter size={20} color={showSpecializationDropdown ? COLORS.primary : COLORS.textSecondary} />
+          <Text style={[
+            styles.filterDropdownText,
+            selectedSpecialization && selectedSpecialization !== 'All Specializations' 
+              ? styles.selectedFilterText 
+              : styles.placeholderText
+          ]}>
+            {selectedSpecialization || 'Filter by specialization'}
+          </Text>
+          <ChevronDown 
+            size={20} 
+            color={showSpecializationDropdown ? COLORS.primary : COLORS.textSecondary}
+            style={[
+              showSpecializationDropdown && styles.rotatedChevron
+            ]}
+          />
         </TouchableOpacity>
-      ))}
+
+        {/* Specialization Dropdown */}
+        {showSpecializationDropdown && (
+          <View style={styles.filterDropdownList}>
+            <ScrollView 
+              style={styles.dropdownScrollView}
+              showsVerticalScrollIndicator={true}
+              nestedScrollEnabled={true}
+              keyboardShouldPersistTaps="always"
+              scrollEnabled={true}
+            >
+              {specializations.map((specialization, index) => (
+                <TouchableOpacity
+                  key={specialization}
+                  style={[
+                    styles.filterDropdownItem,
+                    index === specializations.length - 1 && styles.lastDropdownItem
+                  ]}
+                  onPress={() => {
+                    console.log('Dropdown item pressed:', specialization);
+                    setSelectedSpecialization(specialization === 'All Specializations' ? '' : specialization);
+                    setShowSpecializationDropdown(false);
+                  }}
+                  activeOpacity={0.7}
+                  delayPressIn={0}
+                >
+                  <Text style={[
+                    styles.filterDropdownItemText,
+                    selectedSpecialization === specialization && styles.selectedFilterItemText
+                  ]}>
+                    {specialization}
+                  </Text>
+                  {selectedSpecialization === specialization && (
+                    <View style={styles.checkmarkContainer}>
+                      <Text style={styles.checkmarkText}>✓</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+      </View>
+
+      {/* Results Summary */}
+      <Text style={styles.resultsText}>
+        {filteredDoctors.length} doctor{filteredDoctors.length !== 1 ? 's' : ''} found
+      </Text>
+      
+      {isLoadingDoctors ? (
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading doctors...</Text>
+        </View>
+      ) : filteredDoctors.length > 0 ? (
+        filteredDoctors.map((doctor) => (
+          <TouchableOpacity
+            key={doctor.id}
+            style={[
+              styles.doctorCard,
+              selectedDoctor?.id === doctor.id && styles.selectedDoctorCard
+            ]}
+            onPress={() => setSelectedDoctor(doctor)}
+          >
+            <View style={styles.doctorInfo}>
+              <Text style={styles.doctorName}>{doctor.name}</Text>
+              <Text style={styles.doctorSpecialty}>{doctor.specialty}</Text>
+              <Text style={styles.doctorDetails}>
+                ⭐ {doctor.rating} • {doctor.experience}
+              </Text>
+            </View>
+            {selectedDoctor?.id === doctor.id && (
+              <View style={styles.selectedIndicator}>
+                <Text style={styles.selectedText}>✓</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        ))
+      ) : (
+        <View style={styles.noDoctorsContainer}>
+          <Text style={styles.noDoctorsText}>No doctors found</Text>
+          <Text style={styles.noDoctorsSubtext}>
+            Try adjusting your search criteria
+          </Text>
+        </View>
+      )}
     </View>
   );
 
@@ -559,7 +815,11 @@ export default function NewAppointmentScreen() {
 
       {renderStepIndicator()}
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         {currentStep === 1 && renderDoctorSelection()}
         {currentStep === 2 && renderHospitalSelection()}
         {currentStep === 3 && renderDateSelection()}
@@ -577,9 +837,10 @@ export default function NewAppointmentScreen() {
           />
         ) : (
           <Button
-            title="Book Appointment"
+            title={isBooking ? "Booking..." : "Book Appointment"}
             onPress={handleBookAppointment}
-            style={styles.bookButton}
+            disabled={isBooking}
+            style={[styles.bookButton, isBooking && styles.disabledButton]}
           />
         )}
       </View>
@@ -1011,5 +1272,140 @@ const styles = StyleSheet.create({
   },
   bookButton: {
     backgroundColor: COLORS.primary,
+  },
+  disabledButton: {
+    backgroundColor: COLORS.textSecondary,
+    opacity: 0.6,
+  },
+  loadingContainer: {
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    padding: 32,
+    alignItems: 'center',
+    marginBottom: 12,
+    ...SHADOWS.small,
+  },
+  loadingText: {
+    fontSize: SIZES.md,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+  },
+  filterSection: {
+    marginBottom: 16,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginBottom: 8,
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: SIZES.md,
+    color: COLORS.textPrimary,
+  },
+  filterDropdownButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  activeDropdownButton: {
+    borderColor: COLORS.primary,
+    backgroundColor: '#f8f9ff',
+  },
+  rotatedChevron: {
+    transform: [{ rotate: '180deg' }],
+  },
+  filterDropdownText: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: SIZES.md,
+  },
+  selectedFilterText: {
+    color: COLORS.textPrimary,
+    fontWeight: '500',
+  },
+  filterDropdownList: {
+    backgroundColor: COLORS.white,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginTop: 8,
+    maxHeight: 200,
+    ...SHADOWS.small,
+  },
+  dropdownScrollView: {
+    maxHeight: 200,
+  },
+  filterDropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    minHeight: 48,
+  },
+  lastDropdownItem: {
+    borderBottomWidth: 0,
+  },
+  filterDropdownItemText: {
+    fontSize: SIZES.md,
+    color: COLORS.textPrimary,
+    flex: 1,
+  },
+  selectedFilterItemText: {
+    color: COLORS.primary,
+    fontWeight: '600',
+  },
+  checkmarkContainer: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: COLORS.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  checkmarkText: {
+    color: COLORS.white,
+    fontSize: SIZES.sm,
+    fontWeight: 'bold',
+  },
+  resultsText: {
+    fontSize: SIZES.sm,
+    color: COLORS.textSecondary,
+    marginBottom: 12,
+    fontStyle: 'italic',
+  },
+  noDoctorsContainer: {
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    padding: 32,
+    alignItems: 'center',
+    marginBottom: 12,
+    ...SHADOWS.small,
+  },
+  noDoctorsText: {
+    fontSize: SIZES.md,
+    color: COLORS.textPrimary,
+    marginBottom: 8,
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  noDoctorsSubtext: {
+    fontSize: SIZES.sm,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
   },
 });
