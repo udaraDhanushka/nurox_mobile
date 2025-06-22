@@ -55,9 +55,15 @@ export default function ProfileScreen() {
         },
     ];
 
-    const handleLogout = () => {
-        logout();
-        router.replace('/(auth)');
+    const handleLogout = async () => {
+        try {
+            await logout();
+            router.replace('/(auth)');
+        } catch (error) {
+            console.error('Logout error:', error);
+            // Even if logout fails, redirect to auth
+            router.replace('/(auth)');
+        }
     };
 
     const handleImageUpload = async () => {
