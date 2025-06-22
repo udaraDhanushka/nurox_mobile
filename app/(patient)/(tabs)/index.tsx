@@ -70,7 +70,7 @@ export default function PatientHomeScreen() {
                     </View>
                     <TouchableOpacity
                         style={styles.profileButton}
-                        onPress={() => router.push('/profile')}
+                        onPress={() => router.push('/(patient)/profile')}
                     >
                         {user?.profileImage ? (
                             <Image
