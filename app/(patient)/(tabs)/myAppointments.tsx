@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -6,11 +6,19 @@ import { Calendar, Plus, Hash, Clock, MapPin } from 'lucide-react-native';
 import { COLORS, SIZES, SHADOWS } from '../../../constants/theme';
 import { AppointmentCard } from '../../../components/ui/AppointmentCard';
 import { useAppointmentStore } from '../../../store/appointmentStore';
+import { useFocusEffect } from '@react-navigation/native';
 
 export default function AppointmentsScreen() {
   const router = useRouter();
-  const { appointments } = useAppointmentStore();
+  const { appointments, loadAppointmentsFromAPI, isLoading } = useAppointmentStore();
   const [selectedFilter, setSelectedFilter] = useState('upcoming');
+
+  // Load appointments from API when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      loadAppointmentsFromAPI();
+    }, [loadAppointmentsFromAPI])
+  );
 
   const filteredAppointments = appointments.filter(appointment => {
     const appointmentDate = new Date(appointment.date);
@@ -119,39 +127,47 @@ export default function AppointmentsScreen() {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {sortedAppointments.map((appointment) => (
-          <AppointmentCard
-            key={appointment.id}
-            appointment={appointment}
-            onPress={() => router.push(`/(patient)/patient-appointments/${appointment.id}`)}
-          />
-        ))}
-
-        {sortedAppointments.length === 0 && (
-          <View style={styles.emptyState}>
-            <Calendar size={48} color={COLORS.textSecondary} />
-            <Text style={styles.emptyStateText}>
-              {selectedFilter === 'upcoming' ? 'No upcoming appointments' : 
-               selectedFilter === 'past' ? 'No past appointments' : 
-               'No cancelled appointments'}
-            </Text>
-            <Text style={styles.emptyStateSubtext}>
-              {selectedFilter === 'upcoming' 
-                ? 'Schedule your first appointment to get started'
-                : selectedFilter === 'past'
-                ? 'Your completed appointments will appear here'
-                : 'Your cancelled appointments will appear here'
-              }
-            </Text>
-            {selectedFilter === 'upcoming' && (
-              <TouchableOpacity
-                style={styles.scheduleButton}
-                onPress={() => router.push('/(patient)/patient-appointments/new')}
-              >
-                <Text style={styles.scheduleButtonText}>Schedule Appointment</Text>
-              </TouchableOpacity>
-            )}
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <Text style={styles.loadingText}>Loading appointments...</Text>
           </View>
+        ) : (
+          <>
+            {sortedAppointments.map((appointment) => (
+              <AppointmentCard
+                key={appointment.id}
+                appointment={appointment}
+                onPress={() => router.push(`/(patient)/patient-appointments/${appointment.id}`)}
+              />
+            ))}
+
+            {sortedAppointments.length === 0 && (
+              <View style={styles.emptyState}>
+                <Calendar size={48} color={COLORS.textSecondary} />
+                <Text style={styles.emptyStateText}>
+                  {selectedFilter === 'upcoming' ? 'No upcoming appointments' : 
+                   selectedFilter === 'past' ? 'No past appointments' : 
+                   'No cancelled appointments'}
+                </Text>
+                <Text style={styles.emptyStateSubtext}>
+                  {selectedFilter === 'upcoming' 
+                    ? 'Schedule your first appointment to get started'
+                    : selectedFilter === 'past'
+                    ? 'Your completed appointments will appear here'
+                    : 'Your cancelled appointments will appear here'
+                  }
+                </Text>
+                {selectedFilter === 'upcoming' && (
+                  <TouchableOpacity
+                    style={styles.scheduleButton}
+                    onPress={() => router.push('/(patient)/patient-appointments/new')}
+                  >
+                    <Text style={styles.scheduleButtonText}>Schedule Appointment</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+          </>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -272,5 +288,15 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: SIZES.md,
     fontWeight: '600',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    fontSize: SIZES.md,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
   },
 });
