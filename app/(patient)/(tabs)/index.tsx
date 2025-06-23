@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,31 +9,18 @@ import { useMedicalStore } from '@/store/medicalStore';
 import { useAuthStore } from '@/store/authStore';
 import { useTranslation } from '@/hooks/useTranslation';
 
-const upcomingAppointments = [
-    {
-        id: '1',
-        doctorName: 'Dr. Sarah Wilson',
-        specialty: 'Cardiologist',
-        date: 'Today',
-        time: '14:30',
-        doctorImage: 'https://example.com/doctor1.jpg',
-    },
-    {
-        id: '2',
-        doctorName: 'Dr. Michael Chen',
-        specialty: 'Dermatologist',
-        date: 'Tomorrow',
-        time: '10:00',
-        doctorImage: 'https://example.com/doctor2.jpg',
-    },
-];
-
 export default function PatientHomeScreen() {
     const router = useRouter();
     const { user } = useAuthStore();
-    const { appointments } = useAppointmentStore();
+    const { appointments, loadAppointmentsFromAPI } = useAppointmentStore();
     const { prescriptions, labReports } = useMedicalStore();
     const { t } = useTranslation();
+
+    useEffect(() => {
+        if (user) {
+            loadAppointmentsFromAPI();
+        }
+    }, [user, loadAppointmentsFromAPI]);
 
     const currentDate = new Date().toLocaleDateString('en-US', { 
         weekday: 'long', 
@@ -44,7 +31,7 @@ export default function PatientHomeScreen() {
 
     // Get upcoming appointments (not cancelled)
     const upcomingAppointments = appointments
-        .filter(app => app.status !== 'cancelled')
+        .filter(app => app.status !== 'canceled')
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
         .slice(0, 2);
 

@@ -11,10 +11,17 @@ import Constants from 'expo-constants';
 import { LanguageSelector } from '@/components/ui/LanguageSelector';
 import { useTranslation } from '@/hooks/useTranslation';
 
+interface MenuItem {
+  title: string;
+  icon: React.ReactNode;
+  onPress: () => void;
+  subtitle?: string;
+}
+
 export default function DoctorProfileScreen() {
   const router = useRouter();
   const navigation = useNavigation();
-  const { user, logout, updateUser } = useAuthStore();
+  const { user, logout } = useAuthStore();
   const [isDarkMode, setIsDarkMode] = useState(false);
   const { t } = useTranslation();
   const [showLanguageModal, setShowLanguageModal] = useState(false);
@@ -24,46 +31,30 @@ export default function DoctorProfileScreen() {
     navigation.setOptions({ headerShown: false });
   }, [navigation]);
 
-  const menuItems = [
+  const menuItems: MenuItem[] = [
     {
       title: t('personalInformation'),
       icon: <User size={24} color={isDarkMode ? COLORS.white : COLORS.primary} />,
-      onPress: () => router.push('/(doctor)/profile/personal'),
+      onPress: () => router.push('/(doctor)/profile-settings/personal'),
+      subtitle: 'Basic profile details'
+    },
+    {
+      title: t('specializations'),
+      icon: <Award size={24} color={isDarkMode ? COLORS.white : COLORS.primary} />,
+      onPress: () => router.push('/(doctor)/profile-settings/specializations'),
+      subtitle: 'Medical specializations'
+    },
+    {
+      title: t('hospitalAffiliations'),
+      icon: <Briefcase size={24} color={isDarkMode ? COLORS.white : COLORS.primary} />,
+      onPress: () => router.push('/(doctor)/profile-settings/affiliations'),
+      subtitle: 'Hospital affiliations'
     },
     {
       title: t('language'),
       icon: <Globe size={24} color={isDarkMode ? COLORS.white : COLORS.primary} />,
       onPress: () => setShowLanguageModal(true),
-    },
-    {
-      title: t('medicalLicense'),
-      icon: <Shield size={24} color={isDarkMode ? COLORS.white : COLORS.primary} />,
-      onPress: () => router.push('/(doctor)/profile/license'),
-    },
-    {
-      title: t('specializations'),
-      icon: <Award size={24} color={isDarkMode ? COLORS.white : COLORS.primary} />,
-      onPress: () => router.push('/(doctor)/profile/specializations'),
-    },
-    {
-      title: t('hospitalAffiliations'),
-      icon: <Briefcase size={24} color={isDarkMode ? COLORS.white : COLORS.primary} />,
-      onPress: () => router.push('/(doctor)/profile/affiliations'),
-    },
-    {
-      title: t('professionalSettings'),
-      icon: <Shield size={24} color={isDarkMode ? COLORS.white : COLORS.primary} />,
-      onPress: () => router.push('/(doctor)/profile/settings'),
-    },
-    {
-      title: t('privacyPolicy'),
-      icon: <Lock size={24} color={isDarkMode ? COLORS.white : COLORS.primary} />,
-      onPress: () => router.push('/(doctor)/profile/privacy'),
-    },
-    {
-      title: t('helpSupport'),
-      icon: <FileText size={24} color={isDarkMode ? COLORS.white : COLORS.primary} />,
-      onPress: () => router.push('/(doctor)/profile/support'),
+      subtitle: 'App language settings'
     },
   ];
 
@@ -99,9 +90,16 @@ export default function DoctorProfileScreen() {
       });
 
       if (!result.canceled && result.assets[0].uri) {
-        updateUser({ 
-          profileImage: result.assets[0].uri 
-        });
+        // Update profile image without triggering additional API call
+        const currentUser = useAuthStore.getState().user;
+        if (currentUser) {
+          useAuthStore.setState({ 
+            user: { 
+              ...currentUser,
+              profileImage: result.assets[0].uri 
+            } 
+          });
+        }
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to upload image. Please try again.');
@@ -168,7 +166,16 @@ export default function DoctorProfileScreen() {
           />
         </TouchableOpacity>
 
-        {/* Menu Items */}
+        {/* Profile Settings */}
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, isDarkMode && styles.textDark]}>
+            Profile Settings
+          </Text>
+          <Text style={[styles.sectionSubtitle, isDarkMode && styles.textSecondaryDark]}>
+            Manage your professional profile and preferences
+          </Text>
+        </View>
+        
         <View style={[styles.menuContainer, isDarkMode && styles.menuContainerDark]}>
           {menuItems.map((item, index) => (
             <TouchableOpacity
@@ -183,9 +190,16 @@ export default function DoctorProfileScreen() {
               <View style={[styles.menuIcon, isDarkMode && styles.menuIconDark]}>
                 {item.icon}
               </View>
-              <Text style={[styles.menuTitle, isDarkMode && styles.textDark]}>
-                {item.title}
-              </Text>
+              <View style={styles.menuTextContainer}>
+                <Text style={[styles.menuTitle, isDarkMode && styles.textDark]}>
+                  {item.title}
+                </Text>
+                {item.subtitle && (
+                  <Text style={[styles.menuSubtitle, isDarkMode && styles.textSecondaryDark]}>
+                    {item.subtitle}
+                  </Text>
+                )}
+              </View>
             </TouchableOpacity>
           ))}
         </View>
@@ -315,6 +329,20 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     fontWeight: '500',
   },
+  sectionHeader: {
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: SIZES.lg,
+    fontWeight: 'bold',
+    color: COLORS.textPrimary,
+    marginBottom: 4,
+  },
+  sectionSubtitle: {
+    fontSize: SIZES.sm,
+    color: COLORS.textSecondary,
+    fontWeight: '400',
+  },
   menuContainer: {
     backgroundColor: COLORS.white,
     borderRadius: 12,
@@ -349,11 +377,19 @@ const styles = StyleSheet.create({
   menuIconDark: {
     backgroundColor: '#3a3a3a',
   },
-  menuTitle: {
+  menuTextContainer: {
     flex: 1,
+  },
+  menuTitle: {
     fontSize: SIZES.md,
     color: COLORS.textPrimary,
     fontWeight: '500',
+    marginBottom: 2,
+  },
+  menuSubtitle: {
+    fontSize: SIZES.sm,
+    color: COLORS.textSecondary,
+    fontWeight: '400',
   },
   version: {
     textAlign: 'center',

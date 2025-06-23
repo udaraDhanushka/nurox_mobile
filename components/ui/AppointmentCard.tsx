@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Calendar, Clock, MapPin, Hash } from 'lucide-react-native';
 import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
-import { Appointment } from '../../store/appointmentStore';
+import { Appointment } from '../../types/appointment';
 
 interface AppointmentCardProps {
   appointment: Appointment;

@@ -20,6 +20,8 @@ import {
   MedicalStoreState,
   MedicalStoreActions,
   AppError,
+  LabTestRequest,
+  LabTestTemplate,
 } from '@/types/medical';
 
 // Export status types for use in other components
@@ -85,6 +87,10 @@ interface ExtendedMedicalStoreState extends MedicalStoreState {
   // Original state (keeping ExtendedLabReport for compatibility)
   labReports: ExtendedLabReport[];
   
+  // Lab test requests (doctor-created)
+  labTestRequests: LabTestRequest[];
+  labTestTemplates: LabTestTemplate[];
+  
   // Upload state
   uploadQueue: UploadQueueItem[];
   processingUploads: ProcessingUpload[];
@@ -132,6 +138,21 @@ interface ExtendedMedicalStoreActions extends Omit<MedicalStoreActions, 'addLabR
   removeDetectedMedicine: (prescriptionId: string, medicineId: string) => void;
   verifyDetectedMedicine: (prescriptionId: string, medicineId: string, verified: boolean) => void;
   verifyPrescription: (id: string, verifiedBy: string) => void;
+  
+  // Lab test request management
+  addLabTestRequest: (request: LabTestRequest) => void;
+  updateLabTestRequest: (id: string, updates: Partial<LabTestRequest>) => void;
+  deleteLabTestRequest: (id: string) => void;
+  getLabTestRequestsByPatient: (patientId: string) => LabTestRequest[];
+  getLabTestRequestsByStatus: (status: string) => LabTestRequest[];
+  
+  // Lab test templates
+  addLabTestTemplate: (template: LabTestTemplate) => void;
+  getLabTestTemplates: () => LabTestTemplate[];
+  getLabTestTemplatesByCategory: (category: string) => LabTestTemplate[];
+  
+  // Lab request to report conversion
+  convertLabRequestToReport: (requestId: string, results: any[]) => void;
   
   // Upload history
   addToUploadHistory: (entry: UploadHistoryEntry) => void;
@@ -419,6 +440,66 @@ export const useMedicalStore = create<MedicalStore>()(
       userLocation: null,
       nearbyPharmacies: [],
       nearbyTestCenters: [],
+      
+      // Lab test requests and templates
+      labTestRequests: [],
+      labTestTemplates: [
+        {
+          id: '1',
+          name: 'Complete Blood Count (CBC)',
+          tests: ['White Blood Cell Count', 'Red Blood Cell Count', 'Hemoglobin', 'Hematocrit', 'Platelet Count'],
+          description: 'Comprehensive blood analysis to detect infections, anemia, and blood disorders',
+          category: 'Blood Tests',
+          preparationInstructions: ['No special preparation required'],
+          fastingRequired: false,
+          estimatedTime: '30 minutes',
+          price: 45
+        },
+        {
+          id: '2',
+          name: 'Lipid Panel',
+          tests: ['Total Cholesterol', 'HDL Cholesterol', 'LDL Cholesterol', 'Triglycerides'],
+          description: 'Measures cholesterol and triglyceride levels to assess cardiovascular risk',
+          category: 'Blood Tests',
+          preparationInstructions: ['Fast for 9-12 hours before test', 'Only water is allowed during fasting'],
+          fastingRequired: true,
+          estimatedTime: '15 minutes',
+          price: 55
+        },
+        {
+          id: '3',
+          name: 'Thyroid Function Panel',
+          tests: ['TSH', 'Free T4', 'Free T3'],
+          description: 'Evaluates thyroid gland function and metabolism',
+          category: 'Blood Tests',
+          preparationInstructions: ['Take medications as usual unless instructed otherwise'],
+          fastingRequired: false,
+          estimatedTime: '15 minutes',
+          price: 65
+        },
+        {
+          id: '4',
+          name: 'Liver Function Tests',
+          tests: ['ALT', 'AST', 'Bilirubin', 'Alkaline Phosphatase', 'Albumin'],
+          description: 'Assesses liver health and function',
+          category: 'Blood Tests',
+          preparationInstructions: ['Avoid alcohol 24 hours before test'],
+          fastingRequired: false,
+          estimatedTime: '20 minutes',
+          price: 50
+        },
+        {
+          id: '5',
+          name: 'Basic Metabolic Panel',
+          tests: ['Glucose', 'Sodium', 'Potassium', 'Chloride', 'BUN', 'Creatinine'],
+          description: 'Evaluates kidney function, blood sugar, and electrolyte balance',
+          category: 'Blood Tests',
+          preparationInstructions: ['Fast for 8-12 hours if glucose is included'],
+          fastingRequired: true,
+          estimatedTime: '15 minutes',
+          price: 40
+        }
+      ],
       
       // Upload state
       uploadQueue: [],
@@ -931,6 +1012,104 @@ export const useMedicalStore = create<MedicalStore>()(
         set(() => ({
           nearbyTestCenters: testCenters,
         })),
+
+      // Lab test request actions
+      addLabTestRequest: (request: LabTestRequest) =>
+        set((state) => ({
+          labTestRequests: [...state.labTestRequests, request],
+        })),
+
+      updateLabTestRequest: (id: string, updates: Partial<LabTestRequest>) =>
+        set((state) => ({
+          labTestRequests: state.labTestRequests.map((request) =>
+            request.id === id
+              ? { ...request, ...updates, updatedAt: new Date().toISOString() }
+              : request
+          ),
+        })),
+
+      deleteLabTestRequest: (id: string) =>
+        set((state) => ({
+          labTestRequests: state.labTestRequests.filter((request) => request.id !== id),
+        })),
+
+      getLabTestRequestsByPatient: (patientId: string) => {
+        const state = get();
+        return state.labTestRequests.filter((request) => request.patientId === patientId);
+      },
+
+      getLabTestRequestsByStatus: (status: string) => {
+        const state = get();
+        return state.labTestRequests.filter((request) => request.status === status);
+      },
+
+      // Lab test template actions
+      addLabTestTemplate: (template: LabTestTemplate) =>
+        set((state) => ({
+          labTestTemplates: [...state.labTestTemplates, template],
+        })),
+
+      getLabTestTemplates: () => {
+        const state = get();
+        return state.labTestTemplates;
+      },
+
+      getLabTestTemplatesByCategory: (category: string) => {
+        const state = get();
+        return state.labTestTemplates.filter((template) => template.category === category);
+      },
+
+      // Convert lab request to lab report when completed
+      convertLabRequestToReport: (requestId: string, results: any[]) => {
+        const state = get();
+        const request = state.labTestRequests.find(r => r.id === requestId);
+        
+        if (!request) return;
+
+        // Create lab report from completed request
+        const newLabReport: ExtendedLabReport = {
+          id: `lab_report_${Date.now()}`,
+          testName: request.requestedTests.join(', '),
+          date: new Date().toISOString().split('T')[0],
+          labName: request.assignedTestCenter?.name || 'Lab Center',
+          orderedBy: request.doctorName,
+          status: 'completed',
+          results: results || [],
+          notes: `Lab test completed. Originally requested on ${new Date(request.requestDate).toLocaleDateString()}.`,
+        };
+
+        // Update request status and link to lab report
+        const updatedRequest = {
+          ...request,
+          status: 'completed' as const,
+          labReportId: newLabReport.id,
+          updatedAt: new Date().toISOString(),
+        };
+
+        set((state) => ({
+          labReports: [...state.labReports, newLabReport],
+          labTestRequests: state.labTestRequests.map(r => 
+            r.id === requestId ? updatedRequest : r
+          ),
+        }));
+
+        // Create notification for patient
+        const notification = {
+          id: `lab_result_${Date.now()}`,
+          type: 'results_ready' as const,
+          title: 'Lab Results Available',
+          message: `Your lab results for ${request.requestedTests.slice(0, 2).join(', ')} are now available.`,
+          timestamp: new Date().toISOString(),
+          read: false,
+          relatedId: newLabReport.id,
+          priority: 'medium' as const,
+          category: 'lab' as const,
+        };
+
+        set((state) => ({
+          notifications: [...state.notifications, notification],
+        }));
+      },
     }),
     {
       name: 'medical-store',
@@ -939,6 +1118,8 @@ export const useMedicalStore = create<MedicalStore>()(
         // Persist only essential data
         prescriptions: state.prescriptions,
         labReports: state.labReports,
+        labTestRequests: state.labTestRequests,
+        labTestTemplates: state.labTestTemplates,
         notifications: state.notifications.filter(n => !n.read), // Only keep unread notifications
         uploadHistory: state.uploadHistory.slice(-50), // Keep last 50 entries
         cameraSettings: state.cameraSettings,
@@ -985,6 +1166,31 @@ export const useUploadOperations = () => {
     findPrescription: store.findPrescriptionById,
     isUploadInProgress: store.isUploadInProgress,
     getProcessingUpload: store.getProcessingUpload,
+  };
+};
+
+// Hook for lab request operations
+export const useLabRequestOperations = () => {
+  const store = useMedicalStore();
+  
+  return {
+    // Lab request operations
+    addLabRequest: store.addLabTestRequest,
+    updateLabRequest: store.updateLabTestRequest,
+    deleteLabRequest: store.deleteLabTestRequest,
+    getRequestsByPatient: store.getLabTestRequestsByPatient,
+    getRequestsByStatus: store.getLabTestRequestsByStatus,
+    
+    // Template operations
+    getTemplates: store.getLabTestTemplates,
+    getTemplatesByCategory: store.getLabTestTemplatesByCategory,
+    
+    // Conversion operations
+    convertToReport: store.convertLabRequestToReport,
+    
+    // Getters
+    getAllRequests: () => store.labTestRequests,
+    getAllTemplates: () => store.labTestTemplates,
   };
 };
 

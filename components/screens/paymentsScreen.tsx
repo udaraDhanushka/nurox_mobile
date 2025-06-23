@@ -1,10 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, TextInput, Alert, Image } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, CreditCard, Smartphone, Shield, Lock, Calendar, User, Building, Clock, CheckCircle, FileText } from 'lucide-react-native';
 import { COLORS, SIZES, SHADOWS } from '@/constants/theme';
 import { Button } from '@/components/Button';
+import { StripeProvider, useStripe } from '@stripe/stripe-react-native';
+import { STRIPE_CONFIG } from '@/config/stripe';
+import paymentService, { CreatePaymentIntentRequest, PaymentIntent } from '@/services/paymentService';
+import { useAuthStore } from '@/store/authStore';
 
 interface PaymentMethod {
   id: string;
@@ -22,27 +26,27 @@ const paymentMethods: PaymentMethod[] = [
     icon: '💳',
     subtitle: 'Visa, Mastercard, Amex accepted'
   },
-  {
-    id: 'apple_pay',
-    type: 'digital',
-    name: 'Apple Pay',
-    icon: '🍎',
-    subtitle: 'Pay with Touch ID or Face ID'
-  },
-  {
-    id: 'google_pay',
-    type: 'digital',
-    name: 'Google Pay',
-    icon: '🎯',
-    subtitle: 'Quick and secure payment'
-  },
-  {
-    id: 'samsung_pay',
-    type: 'digital',
-    name: 'Samsung Pay',
-    icon: '📱',
-    subtitle: 'Samsung Wallet payment'
-  },
+  // {
+  //   id: 'apple_pay',
+  //   type: 'digital',
+  //   name: 'Apple Pay',
+  //   icon: '🍎',
+  //   subtitle: 'Pay with Touch ID or Face ID'
+  // },
+  // {
+  //   id: 'google_pay',
+  //   type: 'digital',
+  //   name: 'Google Pay',
+  //   icon: '🎯',
+  //   subtitle: 'Quick and secure payment'
+  // },
+  // {
+  //   id: 'samsung_pay',
+  //   type: 'digital',
+  //   name: 'Samsung Pay',
+  //   icon: '📱',
+  //   subtitle: 'Samsung Wallet payment'
+  // },
   {
     id: 'insurance',
     type: 'insurance',
@@ -52,9 +56,10 @@ const paymentMethods: PaymentMethod[] = [
   }
 ];
 
-export default function PaymentScreen() {
+function PaymentScreenContent() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const { user, token } = useAuthStore();
   
   // Debug: Log received parameters (remove in production)
   console.log('Payment Screen Parameters:', params);
@@ -106,9 +111,8 @@ export default function PaymentScreen() {
       'Consultation': 1.0,
       'Follow-up': 0.7,
       'Routine Checkup': 0.8,
-      'Specialist Consultation': 1.2,
-      'Emergency': 1.5,
-      'Vaccination': 0.5
+      'Specialist Visit': 1.2,
+      'Emergency': 1.5
     };
     
     const baseFee = baseFeesBySpecialty[specialty] || 150.00;
@@ -123,6 +127,8 @@ export default function PaymentScreen() {
   const [cvv, setCvv] = useState('');
   const [cardHolderName, setCardHolderName] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
+  const { initPaymentSheet, presentPaymentSheet } = useStripe();
 
   const formatCardNumber = (text: string) => {
     // Remove all non-digits
@@ -140,39 +146,228 @@ export default function PaymentScreen() {
     return digitsOnly;
   };
 
+  const createPaymentIntent = async (): Promise<PaymentIntent | undefined> => {
+    try {
+      const paymentData: CreatePaymentIntentRequest = {
+        amount: Math.round(appointmentData.total * 100), // Convert to cents
+        currency: 'usd',
+        appointmentId: appointmentData.appointmentId,
+        description: `Appointment with ${appointmentData.doctorName} - ${appointmentData.specialty}`,
+        metadata: {
+          doctorName: appointmentData.doctorName,
+          specialty: appointmentData.specialty,
+          hospitalName: appointmentData.hospitalName,
+          date: appointmentData.date,
+          time: appointmentData.time,
+          tokenNumber: appointmentData.tokenNumber.toString(),
+          appointmentType: appointmentData.appointmentType,
+          // Add fee breakdown for billing history
+          consultationFee: appointmentData.consultationFee || (appointmentData.total * 0.8),
+          hospitalFee: appointmentData.hospitalFee || (appointmentData.total * 0.15),
+          tax: appointmentData.tax || (appointmentData.total * 0.05)
+        }
+      };
+
+      const paymentIntent = await paymentService.createPaymentIntent(paymentData);
+      setPaymentIntentId(paymentIntent.paymentIntentId);
+      return paymentIntent;
+    } catch (error: any) {
+      console.error('Payment intent creation error:', error);
+      
+      // Handle authentication errors specifically
+      if (error.message?.includes('Access token required') || error.message?.includes('Unauthorized')) {
+        Alert.alert(
+          'Authentication Required',
+          'Please log in again to continue with payment.',
+          [
+            {
+              text: 'Go to Login',
+              onPress: () => router.push('/(auth)/login')
+            }
+          ]
+        );
+        return undefined;
+      }
+      
+      throw error;
+    }
+  };
+
+  const initializePaymentSheet = async () => {
+    try {
+      const paymentIntent = await createPaymentIntent();
+      
+      // Check if payment intent was created successfully
+      if (!paymentIntent) {
+        throw new Error('Failed to create payment intent');
+      }
+      
+      console.log('Initializing payment sheet with return URL:', STRIPE_CONFIG.returnURL);
+      
+      const { error } = await initPaymentSheet({
+        merchantDisplayName: 'Nurox Healthcare',
+        paymentIntentClientSecret: paymentIntent.clientSecret,
+        defaultBillingDetails: {
+          name: cardHolderName || undefined,
+        },
+        appearance: {
+          colors: {
+            primary: COLORS.primary,
+          },
+        },
+        returnURL: STRIPE_CONFIG.returnURL,
+      });
+
+      if (error) {
+        console.error('Payment sheet initialization error:', error);
+        throw new Error(error.message);
+      }
+    } catch (error) {
+      console.error('Payment sheet setup error:', error);
+      throw error;
+    }
+  };
+
+  const handleStripePayment = async () => {
+    try {
+      setIsProcessing(true);
+      
+      // Initialize payment sheet if not already done
+      await initializePaymentSheet();
+      
+      // Present payment sheet
+      const { error } = await presentPaymentSheet();
+      
+      if (error) {
+        if (error.code === 'Canceled') {
+          Alert.alert('Payment Canceled', 'Payment was canceled by user.');
+        } else {
+          router.replace({
+            pathname: '/(patient)/payment-failure',
+            params: {
+              errorCode: error.code || 'PAYMENT_FAILED',
+              errorMessage: error.message || 'Payment could not be processed.',
+              amount: appointmentData.total.toString(),
+              doctorName: appointmentData.doctorName,
+              specialty: appointmentData.specialty,
+              date: appointmentData.date,
+              time: appointmentData.time,
+              appointmentId: appointmentData.appointmentId
+            }
+          });
+        }
+        return;
+      }
+
+      // Confirm payment with backend
+      if (paymentIntentId) {
+        const confirmation = await paymentService.confirmPayment({
+          paymentIntentId: paymentIntentId
+        });
+
+        if (confirmation.success) {
+          router.replace({
+            pathname: '/(patient)/payment-success',
+            params: {
+              transactionId: confirmation.payment.transactionId,
+              amount: appointmentData.total.toString(),
+              doctorName: appointmentData.doctorName,
+              specialty: appointmentData.specialty,
+              hospitalName: appointmentData.hospitalName,
+              date: appointmentData.date,
+              time: appointmentData.time,
+              tokenNumber: appointmentData.tokenNumber.toString(),
+              appointmentId: appointmentData.appointmentId,
+              paymentMethod: 'Credit Card'
+            }
+          });
+        } else {
+          router.replace({
+            pathname: '/(patient)/payment-failure',
+            params: {
+              errorCode: 'CONFIRMATION_FAILED',
+              errorMessage: 'Payment was processed but confirmation failed. Please contact support.',
+              amount: appointmentData.total.toString(),
+              doctorName: appointmentData.doctorName,
+              specialty: appointmentData.specialty,
+              date: appointmentData.date,
+              time: appointmentData.time,
+              appointmentId: appointmentData.appointmentId,
+              transactionId: confirmation.payment?.transactionId || ''
+            }
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Payment processing error:', error);
+      router.replace({
+        pathname: '/(patient)/payment-failure',
+        params: {
+          errorCode: 'NETWORK_ERROR',
+          errorMessage: 'An error occurred while processing your payment. Please try again.',
+          amount: appointmentData.total.toString(),
+          doctorName: appointmentData.doctorName,
+          specialty: appointmentData.specialty,
+          date: appointmentData.date,
+          time: appointmentData.time,
+          appointmentId: appointmentData.appointmentId
+        }
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleInsurancePayment = async () => {
+    setIsProcessing(true);
+    
+    // Simulate insurance payment processing
+    setTimeout(() => {
+      setIsProcessing(false);
+      router.replace({
+        pathname: '/(patient)/payment-success',
+        params: {
+          transactionId: `INS-${Date.now()}`,
+          amount: appointmentData.total.toString(),
+          doctorName: appointmentData.doctorName,
+          specialty: appointmentData.specialty,
+          hospitalName: appointmentData.hospitalName,
+          date: appointmentData.date,
+          time: appointmentData.time,
+          tokenNumber: appointmentData.tokenNumber.toString(),
+          appointmentId: appointmentData.appointmentId,
+          paymentMethod: 'Insurance Coverage'
+        }
+      });
+    }, 2000);
+  };
+
   const handlePayment = async () => {
+    // Check if user is authenticated
+    if (!user || !token) {
+      Alert.alert(
+        'Authentication Required',
+        'Please log in to continue with payment.',
+        [
+          {
+            text: 'Go to Login',
+            onPress: () => router.push('/(auth)/login')
+          }
+        ]
+      );
+      return;
+    }
+
     if (!selectedPaymentMethod) {
       Alert.alert('Payment Method Required', 'Please select a payment method');
       return;
     }
 
     if (selectedPaymentMethod === 'card') {
-      if (!cardNumber || !expiryDate || !cvv || !cardHolderName) {
-        Alert.alert('Card Details Required', 'Please fill in all card details');
-        return;
-      }
+      await handleStripePayment();
+    } else if (selectedPaymentMethod === 'insurance') {
+      await handleInsurancePayment();
     }
-
-    setIsProcessing(true);
-
-    // Simulate payment processing
-    setTimeout(() => {
-      setIsProcessing(false);
-      Alert.alert(
-        'Payment Successful! 🎉',
-        `Your appointment has been booked and payment of ${appointmentData.total.toFixed(2)} has been processed successfully.\n\nAppointment Details:\n• Doctor: ${appointmentData.doctorName}\n• Date: ${new Date(appointmentData.date).toLocaleDateString()}\n• Time: ${appointmentData.time}\n• Token: #${appointmentData.tokenNumber}`,
-        [
-          {
-            text: 'View Appointments',
-            onPress: () => router.push(`/patient-appointments/${appointmentData.appointmentId}`)
-          },
-          {
-            text: 'View Receipt', 
-            onPress: () => router.push('/(patient)/patient-billing-history')
-          }
-        ]
-      );
-    }, 2000);
   };
 
   const renderAppointmentSummary = () => (
@@ -413,6 +608,18 @@ export default function PaymentScreen() {
         />
       </View>
     </SafeAreaView>
+  );
+}
+
+export default function PaymentScreen() {
+  return (
+    <StripeProvider
+      publishableKey={STRIPE_CONFIG.publishableKey}
+      merchantIdentifier={STRIPE_CONFIG.merchantIdentifier}
+      urlScheme={STRIPE_CONFIG.urlScheme}
+    >
+      <PaymentScreenContent />
+    </StripeProvider>
   );
 }
 

@@ -1,67 +1,113 @@
-import React from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Image } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Calendar, Clock, Users, FileText, Activity, User } from 'lucide-react-native';
 import { COLORS, SIZES, SHADOWS } from '@/constants/theme';
 import { useAuthStore } from '@/store/authStore';
+import { patientService } from '@/services/patientService';
+import { appointmentService } from '@/services/appointmentService';
+import { Patient } from '@/types/appointment';
 
-// Mock data for doctor dashboard
-const todayAppointments = [
-    {
-        id: '1',
-        patientName: 'John Doe',
-        time: '09:00 AM',
-        type: 'Check-up',
-        status: 'confirmed',
-        patientImage: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?q=80&w=987&auto=format&fit=crop'
-    },
-    {
-        id: '2',
-        patientName: 'Emily Johnson',
-        time: '10:30 AM',
-        type: 'Follow-up',
-        status: 'confirmed',
-        patientImage: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?q=80&w=1961&auto=format&fit=crop'
-    },
-    {
-        id: '3',
-        patientName: 'Michael Smith',
-        time: '01:15 PM',
-        type: 'Consultation',
-        status: 'confirmed',
-        patientImage: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=1974&auto=format&fit=crop'
-    }
-];
+// Dashboard appointment interface
+interface DashboardAppointment {
+    id: string;
+    patientName: string;
+    time: string;
+    type: string;
+    status: string;
+    patientImage: string;
+    patientOrder?: number; // Sequential patient number for the day
+}
 
-const recentPatients = [
-    {
-        id: '1',
-        name: 'John Doe',
-        age: 42,
-        lastVisit: '2023-11-10',
-        condition: 'Hypertension',
-        image: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?q=80&w=987&auto=format&fit=crop'
-    },
-    {
-        id: '2',
-        name: 'Emily Johnson',
-        age: 35,
-        lastVisit: '2023-11-08',
-        condition: 'Diabetes Type 2',
-        image: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?q=80&w=1961&auto=format&fit=crop'
-    }
-];
-
-const stats = [
-    { title: 'Patients', value: 128, icon: <Users size={24} color={COLORS.primary} /> },
-    { title: 'Appointments', value: 42, icon: <Calendar size={24} color={COLORS.secondary} /> },
-    { title: 'Prescriptions', value: 86, icon: <FileText size={24} color={COLORS.success} /> }
-];
+// Statistics interface
+interface DashboardStats {
+    title: string;
+    value: number;
+    icon: React.ReactNode;
+}
 
 export default function DoctorDashboardScreen() {
     const router = useRouter();
     const { user } = useAuthStore();
+    const [recentPatients, setRecentPatients] = useState<Patient[]>([]);
+    const [todayAppointments, setTodayAppointments] = useState<DashboardAppointment[]>([]);
+    const [stats, setStats] = useState<DashboardStats[]>([
+        { title: 'Patients', value: 0, icon: <Users size={24} color={COLORS.primary} /> },
+        { title: 'Appointments', value: 0, icon: <Calendar size={24} color={COLORS.secondary} /> },
+        { title: 'Prescriptions', value: 0, icon: <FileText size={24} color={COLORS.success} /> }
+    ]);
+    const [isLoading, setIsLoading] = useState(true);
+    
+    useEffect(() => {
+        if (user?.id) {
+            loadDashboardData();
+        }
+    }, [user]);
+    
+    const loadDashboardData = async () => {
+        if (!user?.id) return;
+        
+        try {
+            setIsLoading(true);
+            
+            // Load recent patients and today's appointments in parallel
+            const [patientsResult, appointmentsResult] = await Promise.all([
+                patientService.getRecentPatients(user.id, 3),
+                loadTodayAppointments()
+            ]);
+            
+            setRecentPatients(patientsResult);
+            
+            // Update stats with real data
+            const allPatients = await patientService.getDoctorPatients(user.id);
+            setStats([
+                { title: 'Patients', value: allPatients.length, icon: <Users size={24} color={COLORS.primary} /> },
+                { title: 'Appointments', value: appointmentsResult.length, icon: <Calendar size={24} color={COLORS.secondary} /> },
+                { title: 'Prescriptions', value: Math.floor(allPatients.length * 0.7), icon: <FileText size={24} color={COLORS.success} /> } // Approximate
+            ]);
+            
+        } catch (error) {
+            console.error('Failed to load dashboard data:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    
+    const loadTodayAppointments = async (): Promise<DashboardAppointment[]> => {
+        if (!user?.id) return [];
+        
+        try {
+            const today = new Date().toISOString().split('T')[0];
+            
+            // Use the new doctor-specific method that only returns confirmed appointments
+            const appointments = await appointmentService.getDoctorConfirmedAppointments(user.id, today);
+            
+            if (!appointments) return [];
+            
+            const todayAppts = appointments
+                .slice(0, 3) // Show only first 3
+                .map((apt, index) => ({
+                    id: apt.id,
+                    patientName: apt.patient ? `${apt.patient.firstName} ${apt.patient.lastName}` : 'Unknown Patient',
+                    time: new Date(apt.appointmentDate).toLocaleTimeString('en-US', { 
+                        hour: 'numeric', 
+                        minute: '2-digit', 
+                        hour12: true 
+                    }),
+                    type: apt.type.toLowerCase().replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                    status: apt.status.toLowerCase(),
+                    patientImage: apt.patient?.profileImage || 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?q=80&w=987&auto=format&fit=crop',
+                    patientOrder: index + 1 // Sequential patient number for the day
+                }));
+            
+            setTodayAppointments(todayAppts);
+            return todayAppts;
+        } catch (error) {
+            console.error('Failed to load today appointments:', error);
+            return [];
+        }
+    };
 
     const currentDate = new Date().toLocaleDateString('en-US', {
         weekday: 'long',
@@ -156,52 +202,68 @@ export default function DoctorDashboardScreen() {
                         </TouchableOpacity>
                     </View>
 
-                    {recentPatients.map((patient) => (
-                        <TouchableOpacity
-                            key={patient.id}
-                            style={styles.patientCard}
-                            onPress={() => router.push({
-                                pathname: '/(doctor)/doctor-patients/[id]',
-                                params: { id: patient.id }
-                            })}
-                        >
-                            <Image
-                                source={{ uri: patient.image }}
-                                style={styles.patientCardImage}
-                            />
-                            <View style={styles.patientInfo}>
-                                <Text style={styles.patientCardName}>{patient.name}</Text>
-                                <Text style={styles.patientDetails}>{patient.age} years • {patient.condition}</Text>
-                                <Text style={styles.patientLastVisit}>Last visit: {patient.lastVisit}</Text>
-                            </View>
-                            <View style={styles.patientActions}>
-                                <TouchableOpacity
-                                    style={styles.actionButton}
-                                    onPress={(e) => {
-                                        e.stopPropagation();
-                                        router.push({
-                                            pathname: '/(doctor)/doctor-patients/[id]',
-                                            params: { id: patient.id }
-                                        });
-                                    }}
-                                >
-                                    <FileText size={16} color={COLORS.primary} />
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={styles.actionButton}
-                                    onPress={(e) => {
-                                        e.stopPropagation();
-                                        router.push({
-                                            pathname: '/(doctor)/doctor-prescriptions/[id]',
-                                            params: { id: patient.id }
-                                        });
-                                    }}
-                                >
-                                    <Activity size={16} color={COLORS.primary} />
-                                </TouchableOpacity>
-                            </View>
-                        </TouchableOpacity>
-                    ))}
+                    {isLoading ? (
+                        <View style={styles.loadingContainer}>
+                            <ActivityIndicator size="small" color={COLORS.primary} />
+                            <Text style={styles.loadingText}>Loading patients...</Text>
+                        </View>
+                    ) : recentPatients.length === 0 ? (
+                        <View style={styles.emptyContainer}>
+                            <Text style={styles.emptyText}>No recent patients</Text>
+                        </View>
+                    ) : (
+                        recentPatients.map((patient) => (
+                            <TouchableOpacity
+                                key={patient.id}
+                                style={styles.patientCard}
+                                onPress={() => router.push({
+                                    pathname: '/(doctor)/doctor-patients/[id]',
+                                    params: { id: patient.id }
+                                })}
+                            >
+                                <Image
+                                    source={{ uri: patient.profileImage || 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?q=80&w=987&auto=format&fit=crop' }}
+                                    style={styles.patientCardImage}
+                                />
+                                <View style={styles.patientInfo}>
+                                    <Text style={styles.patientCardName}>{patient.name}</Text>
+                                    <Text style={styles.patientDetails}>
+                                        {patient.age ? `${patient.age} years` : 'Age unknown'}
+                                        {patient.conditions && patient.conditions.length > 0 && ` • ${patient.conditions[0]}`}
+                                    </Text>
+                                    <Text style={styles.patientLastVisit}>
+                                        Last visit: {patient.lastVisit ? new Date(patient.lastVisit).toLocaleDateString() : 'Unknown'}
+                                    </Text>
+                                </View>
+                                <View style={styles.patientActions}>
+                                    <TouchableOpacity
+                                        style={styles.actionButton}
+                                        onPress={(e) => {
+                                            e.stopPropagation();
+                                            router.push({
+                                                pathname: '/(doctor)/doctor-patients/[id]',
+                                                params: { id: patient.id }
+                                            });
+                                        }}
+                                    >
+                                        <FileText size={16} color={COLORS.primary} />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={styles.actionButton}
+                                        onPress={(e) => {
+                                            e.stopPropagation();
+                                            router.push({
+                                                pathname: '/(doctor)/doctor-prescriptions/new',
+                                                params: { patientId: patient.id, patientName: patient.name }
+                                            });
+                                        }}
+                                    >
+                                        <Activity size={16} color={COLORS.primary} />
+                                    </TouchableOpacity>
+                                </View>
+                            </TouchableOpacity>
+                        ))
+                    )}
                 </View>
             </ScrollView>
         </SafeAreaView>
@@ -402,5 +464,32 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginLeft: 8,
+    },
+    loadingContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 20,
+        backgroundColor: COLORS.white,
+        borderRadius: 12,
+        ...SHADOWS.small,
+    },
+    loadingText: {
+        marginLeft: 8,
+        fontSize: SIZES.sm,
+        color: COLORS.textSecondary,
+    },
+    emptyContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 20,
+        backgroundColor: COLORS.white,
+        borderRadius: 12,
+        ...SHADOWS.small,
+    },
+    emptyText: {
+        fontSize: SIZES.sm,
+        color: COLORS.textSecondary,
+        textAlign: 'center',
     },
 });

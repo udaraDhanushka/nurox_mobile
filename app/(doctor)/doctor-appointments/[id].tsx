@@ -1,20 +1,21 @@
-import React from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Image, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Image, Alert, ActivityIndicator } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Calendar, Clock, MapPin, Phone, MessageCircle, Edit, X } from 'lucide-react-native';
 import { COLORS, SIZES, SHADOWS } from '../../../constants/theme';
 import { Button } from '../../../components/Button';
+import { appointmentService } from '../../../services/appointmentService';
+import { ApiAppointment } from '../../../types/appointment';
 
-// Define the appointment type
-interface DoctorAppointment {
+// Define the appointment type for display
+interface DoctorAppointmentDisplay {
   id: string;
   patientName: string;
   patientImage: string;
   patientAge: number;
   patientPhone: string;
   date: string;
-  tokenNumber: number;
   time: string;
   duration: string;
   type: string;
@@ -31,86 +32,97 @@ interface DoctorAppointment {
   };
 }
 
-// Mock doctor appointments data
-const mockDoctorAppointments: Record<string, DoctorAppointment> = {
-  '1': {
-    id: '1',
-    patientName: 'John Smith',
-    patientImage: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?q=80&w=987&auto=format&fit=crop',
-    patientAge: 45,
-    patientPhone: '+1 (555) 123-4567',
-    date: '2024-01-15',
-    tokenNumber: 1,
-    time: '10:00 AM',
-    duration: '30 minutes',
-    type: 'Follow-up',
-    status: 'confirmed',
-    notes: 'Patient reports improvement in symptoms. Continue current medication.',
-    symptoms: 'Mild headaches, improved sleep',
-    medicalHistory: 'Hypertension, Type 2 Diabetes',
-    currentMedications: 'Metformin 500mg, Lisinopril 10mg',
+// Transform API appointment to display format
+const transformApiAppointmentToDisplay = (apiAppointment: ApiAppointment): DoctorAppointmentDisplay => {
+  const patientAge = 30; // Default age since not available in API
+  
+  return {
+    id: apiAppointment.id,
+    patientName: apiAppointment.patient 
+      ? `${apiAppointment.patient.firstName} ${apiAppointment.patient.lastName}` 
+      : 'Unknown Patient',
+    patientImage: apiAppointment.patient?.profileImage || 
+      'https://images.unsplash.com/photo-1599566150163-29194dcaad36?q=80&w=987&auto=format&fit=crop',
+    patientAge,
+    patientPhone: apiAppointment.patient?.phone || 'Not provided',
+    date: new Date(apiAppointment.appointmentDate).toISOString().split('T')[0],
+    time: new Date(apiAppointment.appointmentDate).toLocaleTimeString('en-US', { 
+      hour: 'numeric', 
+      minute: '2-digit', 
+      hour12: true 
+    }),
+    duration: `${apiAppointment.duration || 30} minutes`,
+    type: apiAppointment.type.toLowerCase().replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+    status: apiAppointment.status.toLowerCase(),
+    notes: apiAppointment.notes || 'No notes provided',
+    symptoms: apiAppointment.description || 'No symptoms recorded',
+    medicalHistory: 'Patient medical history not available in current system',
+    currentMedications: 'Current medications not available in current system',
     vitalSigns: {
-      bloodPressure: '130/85 mmHg',
-      heartRate: '72 bpm',
-      temperature: '98.6°F',
-      weight: '180 lbs'
+      bloodPressure: 'Not recorded',
+      heartRate: 'Not recorded',
+      temperature: 'Not recorded',
+      weight: 'Not recorded'
     }
-  },
-  '2': {
-    id: '2',
-    patientName: 'Emily Johnson',
-    patientImage: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?q=80&w=987&auto=format&fit=crop',
-    patientAge: 32,
-    patientPhone: '+1 (555) 987-6543',
-    date: '2024-01-16',
-    tokenNumber: 2,
-    time: '2:30 PM',
-    duration: '45 minutes',
-    type: 'Consultation',
-    status: 'pending',
-    notes: 'New patient consultation for chronic fatigue.',
-    symptoms: 'Chronic fatigue, muscle weakness',
-    medicalHistory: 'No significant medical history',
-    currentMedications: 'Vitamin D supplements',
-    vitalSigns: {
-      bloodPressure: '120/80 mmHg',
-      heartRate: '68 bpm',
-      temperature: '98.4°F',
-      weight: '140 lbs'
-    }
-  },
-  '3': {
-    id: '3',
-    patientName: 'Robert Davis',
-    patientImage: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=987&auto=format&fit=crop',
-    patientAge: 58,
-    patientPhone: '+1 (555) 456-7890',
-    date: '2024-01-17',
-    tokenNumber: 3,
-    time: '11:15 AM',
-    duration: '60 minutes',
-    type: 'Annual Check-up',
-    status: 'completed',
-    notes: 'Annual physical examination completed. All vitals normal.',
-    symptoms: 'No current symptoms',
-    medicalHistory: 'High cholesterol, previous heart surgery',
-    currentMedications: 'Atorvastatin 20mg, Aspirin 81mg',
-    vitalSigns: {
-      bloodPressure: '125/82 mmHg',
-      heartRate: '75 bpm',
-      temperature: '98.7°F',
-      weight: '195 lbs'
-    }
-  }
+  };
 };
 
 export default function DoctorAppointmentDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
-  
-  const appointment = mockDoctorAppointments[id as string];
+  const [appointment, setAppointment] = useState<DoctorAppointmentDisplay | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  if (!appointment) {
+  useEffect(() => {
+    loadAppointment();
+  }, [id]);
+
+  const loadAppointment = async () => {
+    if (!id || typeof id !== 'string') {
+      setError('Invalid appointment ID');
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const apiAppointment = await appointmentService.getAppointment(id);
+      const displayAppointment = transformApiAppointmentToDisplay(apiAppointment as any);
+      setAppointment(displayAppointment);
+    } catch (err) {
+      console.error('Failed to load appointment:', err);
+      setError('Failed to load appointment details');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <ArrowLeft size={24} color={COLORS.textPrimary} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Appointment Details</Text>
+          <View style={{ width: 24 }} />
+        </View>
+        
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Text style={styles.loadingText}>Loading appointment details...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error || !appointment) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
@@ -125,11 +137,17 @@ export default function DoctorAppointmentDetailScreen() {
         </View>
         
         <View style={styles.notFoundContainer}>
-          <Text style={styles.notFoundText}>Appointment not found</Text>
+          <Text style={styles.notFoundText}>{error || 'Appointment not found'}</Text>
+          <Button
+            title="Try Again"
+            onPress={loadAppointment}
+            style={styles.goBackButton}
+          />
           <Button
             title="Go Back"
+            variant="outline"
             onPress={() => router.back()}
-            style={styles.goBackButton}
+            style={[styles.goBackButton, { marginTop: 12 }]}
           />
         </View>
       </SafeAreaView>
@@ -142,7 +160,7 @@ export default function DoctorAppointmentDetailScreen() {
         return COLORS.success;
       case 'pending':
         return COLORS.warning;
-      case 'cancelled':
+      case 'canceled':
         return COLORS.error;
       case 'completed':
         return COLORS.primary;
@@ -578,8 +596,27 @@ const styles = StyleSheet.create({
     fontSize: SIZES.lg,
     color: COLORS.textSecondary,
     marginBottom: 16,
+    textAlign: 'center',
   },
   goBackButton: {
     width: 200,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    fontSize: SIZES.md,
+    color: COLORS.textSecondary,
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  detailSubValue: {
+    fontSize: SIZES.sm,
+    color: COLORS.primary,
+    fontWeight: '600',
+    marginTop: 4,
   },
 });
