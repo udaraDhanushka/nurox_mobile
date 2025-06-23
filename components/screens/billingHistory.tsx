@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, TextInput, Alert, FlatList } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -20,6 +20,7 @@ import {
 import { COLORS, SIZES, SHADOWS } from '@/constants/theme';
 import { Button } from '@/components/Button';
 import { useAppointmentStore } from '@/store/appointmentStore';
+import paymentService, { PaymentHistoryItem, PaymentHistoryResponse } from '@/services/paymentService';
 
 interface BillingItem {
   id: string;
@@ -46,74 +47,89 @@ export default function BillingHistoryScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'paid' | 'pending' | 'refunded'>('all');
   const [showFilters, setShowFilters] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [realPaymentHistory, setRealPaymentHistory] = useState<PaymentHistoryItem[]>([]);
 
-  // Convert appointments to billing items
+  // Load real payment history from backend
+  const loadPaymentHistory = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const response = await paymentService.getPaymentHistory();
+      
+      if (response.success && response.data?.payments) {
+        setRealPaymentHistory(response.data.payments);
+      } else {
+        setError('No payment history found.');
+        setRealPaymentHistory([]);
+      }
+      
+    } catch (err) {
+      console.error('Failed to load payment history:', err);
+      setError('Could not load payment history from server.');
+      setRealPaymentHistory([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Load payment history on component mount
+  useEffect(() => {
+    loadPaymentHistory();
+  }, []);
+
+  // Convert real payment history to billing items
   const billingData: BillingItem[] = useMemo(() => {
-    return appointments
-      .filter(appointment => appointment.status !== 'cancelled') // Exclude cancelled appointments
-      .map(appointment => {
-        // Calculate fees based on specialty and appointment type
-        const consultationFee = calculateConsultationFee(appointment.specialty, appointment.type);
-        const hospitalFee = 25.00;
-        const subtotal = consultationFee + hospitalFee;
-        const tax = subtotal * 0.10;
-        const total = subtotal + tax;
-
-        // Determine payment status based on appointment status
-        let paymentStatus: 'paid' | 'pending' | 'refunded' | 'failed' = 'pending';
-        if (appointment.status === 'completed') {
-          paymentStatus = 'paid';
-        } else if (appointment.status === 'confirmed' || appointment.status === 'pending') {
-          paymentStatus = 'paid'; // Assume payment was made to confirm
-        }
+    return realPaymentHistory
+      .filter(payment => payment.appointmentId) // Only show appointment-related payments
+      .map(payment => {
+        const doctorName = payment.appointment 
+          ? `${payment.appointment.doctor.firstName} ${payment.appointment.doctor.lastName}`
+          : 'Unknown Doctor';
+        
+        // Map backend payment status to frontend status
+        const statusMap: { [key: string]: 'paid' | 'pending' | 'refunded' | 'failed' } = {
+          'COMPLETED': 'paid',
+          'PENDING': 'pending',
+          'REFUNDED': 'refunded',
+          'FAILED': 'failed'
+        };
+        
+        const mappedStatus = statusMap[payment.status] || 'pending';
+        
+        // Parse metadata for fee breakdown or calculate from amount
+        const metadata = payment.metadata || {};
+        const totalAmount = payment.amount / 100; // Convert from cents
+        
+        // Try to get fee breakdown from metadata, otherwise estimate
+        const consultationFee = metadata.consultationFee || (totalAmount * 0.8);
+        const hospitalFee = metadata.hospitalFee || (totalAmount * 0.15);
+        const tax = metadata.tax || (totalAmount * 0.05);
 
         return {
-          id: `bill-${appointment.id}`,
-          appointmentId: appointment.id,
-          date: appointment.date,
-          doctorName: appointment.doctorName,
-          specialty: appointment.specialty,
-          hospitalName: appointment.hospitalName,
-          appointmentType: appointment.type,
-          amount: total,
-          paymentMethod: 'card' as const, // Default to card, could be stored in appointment
-          status: paymentStatus,
-          receiptId: `RCP-${appointment.id.slice(-6).toUpperCase()}`,
+          id: payment.id,
+          appointmentId: payment.appointmentId!,
+          date: payment.appointment?.appointmentDate || payment.createdAt,
+          doctorName,
+          specialty: metadata.specialty || 'General Practice',
+          hospitalName: metadata.hospitalName || 'Unknown Hospital',
+          appointmentType: payment.appointment?.type || 'Consultation',
+          amount: totalAmount,
+          paymentMethod: payment.method.toLowerCase() as 'card' | 'apple_pay' | 'google_pay' | 'insurance',
+          status: mappedStatus,
+          receiptId: payment.transactionId || payment.id,
           consultationFee,
           hospitalFee,
           tax,
-          paymentId: appointment.paymentId || undefined,
+          paymentId: payment.id,
         };
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()); // Sort by date, newest first
-  }, [appointments]);
+  }, [realPaymentHistory]);
 
-  // Calculate consultation fee based on specialty and appointment type
-  function calculateConsultationFee(specialty: string, appointmentType: string): number {
-    const baseFeesBySpecialty: { [key: string]: number } = {
-      'Cardiologist': 200.00,
-      'Dermatologist': 150.00,
-      'Pediatrician': 120.00,
-      'Orthopedic': 180.00,
-      'Neurology': 250.00,
-      'ENT Specialist': 140.00,
-      'General Physician': 100.00,
-    };
-    
-    const typeMultipliers: { [key: string]: number } = {
-      'Consultation': 1.0,
-      'Follow-up': 0.7,
-      'Routine Checkup': 0.8,
-      'Specialist Consultation': 1.2,
-      'Emergency': 1.5,
-      'Vaccination': 0.5
-    };
-    
-    const baseFee = baseFeesBySpecialty[specialty] || 150.00;
-    const multiplier = typeMultipliers[appointmentType] || 1.0;
-    
-    return Math.round(baseFee * multiplier * 100) / 100;
-  }
+  // No longer needed - using real payment data with actual amounts
 
   const filteredData = billingData.filter(item => {
     const matchesSearch = 
@@ -166,12 +182,12 @@ export default function BillingHistoryScreen() {
     switch (method) {
       case 'card':
         return '💳';
-      case 'apple_pay':
-        return '🍎';
-      case 'google_pay':
-        return '🎯';
-      case 'samsung_pay':
-        return '📱';
+      // case 'apple_pay':
+      //   return '🍎';
+      // case 'google_pay':
+      //   return '🎯';
+      // case 'samsung_pay':
+      //   return '📱';
       case 'insurance':
         return '🏥';
       default:
@@ -180,14 +196,23 @@ export default function BillingHistoryScreen() {
   };
 
   const handleDownloadReceipt = (item: BillingItem) => {
+    if (item.status !== 'paid') {
+      Alert.alert('Receipt Not Available', 'Receipt can only be downloaded for paid appointments');
+      return;
+    }
+
     Alert.alert(
       'Download Receipt',
       `Download receipt ${item.receiptId} for ${item.doctorName} appointment?`,
       [
         { text: 'Cancel', style: 'cancel' },
         { 
-          text: 'Download', 
-          onPress: () => Alert.alert('Success', 'Receipt downloaded to your device')
+          text: 'PDF', 
+          onPress: () => Alert.alert('Success', 'Receipt PDF downloaded to Downloads folder')
+        },
+        { 
+          text: 'Email', 
+          onPress: () => Alert.alert('Success', 'Receipt emailed to your registered email address')
         }
       ]
     );
@@ -204,6 +229,39 @@ export default function BillingHistoryScreen() {
           onPress: () => router.push(`/(patient)/patient-appointments/${item.appointmentId}`)
         }
       ]
+    );
+  };
+
+  const handleMoreOptions = (item: BillingItem) => {
+    const buttons: Array<{
+      text: string;
+      style?: 'cancel' | 'default' | 'destructive';
+      onPress?: () => void;
+    }> = [
+      { text: 'Cancel', style: 'cancel' },
+      { 
+        text: 'Share Receipt', 
+        onPress: () => Alert.alert('Success', 'Receipt sharing link copied to clipboard')
+      },
+      { 
+        text: 'Report Issue', 
+        onPress: () => Alert.alert('Report Issue', 'Please contact support for billing issues')
+      }
+    ];
+
+    // Add refund option only for paid items
+    if (item.status === 'paid') {
+      buttons.push({
+        text: 'Request Refund',
+        style: 'destructive',
+        onPress: () => Alert.alert('Refund Request', 'Refund request has been submitted')
+      });
+    }
+
+    Alert.alert(
+      'More Options',
+      `Additional actions for ${item.doctorName} appointment`,
+      buttons
     );
   };
 
@@ -270,7 +328,7 @@ export default function BillingHistoryScreen() {
               styles.filterChip,
               selectedFilter === filter.key && styles.activeFilterChip
             ]}
-            onPress={() => setSelectedFilter(filter.key as any)}
+            onPress={() => setSelectedFilter(filter.key as 'all' | 'paid' | 'pending' | 'refunded')}
           >
             <Text style={[
               styles.filterChipText,
@@ -369,29 +427,88 @@ export default function BillingHistoryScreen() {
           <Text style={styles.actionButtonText}>Appointment</Text>
         </TouchableOpacity>
         
-        <TouchableOpacity style={styles.moreButton}>
+        <TouchableOpacity 
+          style={styles.moreButton}
+          onPress={() => handleMoreOptions(item)}
+        >
           <MoreVertical size={16} color={COLORS.textSecondary} />
         </TouchableOpacity>
       </View>
     </View>
   );
 
+  const handleExportAll = () => {
+    Alert.alert(
+      'Export Billing Data',
+      'Export all billing records to PDF or CSV?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'PDF', 
+          onPress: () => Alert.alert('Success', 'Billing data exported to PDF')
+        },
+        { 
+          text: 'CSV', 
+          onPress: () => Alert.alert('Success', 'Billing data exported to CSV')
+        }
+      ]
+    );
+  };
+
+  const handleMonthlyReport = () => {
+    const currentMonth = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    Alert.alert(
+      'Monthly Report',
+      `Generate detailed report for ${currentMonth}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Generate', 
+          onPress: () => Alert.alert('Success', `${currentMonth} report generated successfully`)
+        }
+      ]
+    );
+  };
+
+  const handleInsuranceClaims = () => {
+    Alert.alert(
+      'Insurance Claims',
+      'View and manage your insurance claim submissions',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'View Claims', 
+          onPress: () => Alert.alert('Coming Soon', 'Insurance claims feature will be available soon')
+        }
+      ]
+    );
+  };
+
   const renderQuickActions = () => (
     <View style={styles.quickActionsContainer}>
       <Text style={styles.sectionTitle}>Quick Actions</Text>
       
       <View style={styles.quickActions}>
-        <TouchableOpacity style={styles.quickActionButton}>
+        <TouchableOpacity 
+          style={styles.quickActionButton}
+          onPress={handleExportAll}
+        >
           <FileText size={20} color={COLORS.primary} />
           <Text style={styles.quickActionText}>Export All</Text>
         </TouchableOpacity>
         
-        <TouchableOpacity style={styles.quickActionButton}>
+        <TouchableOpacity 
+          style={styles.quickActionButton}
+          onPress={handleMonthlyReport}
+        >
           <Calendar size={20} color={COLORS.primary} />
           <Text style={styles.quickActionText}>Monthly Report</Text>
         </TouchableOpacity>
         
-        <TouchableOpacity style={styles.quickActionButton}>
+        <TouchableOpacity 
+          style={styles.quickActionButton}
+          onPress={handleInsuranceClaims}
+        >
           <Shield size={20} color={COLORS.primary} />
           <Text style={styles.quickActionText}>Insurance Claims</Text>
         </TouchableOpacity>
@@ -409,16 +526,42 @@ export default function BillingHistoryScreen() {
           <ArrowLeft size={24} color={COLORS.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Billing History</Text>
-        <TouchableOpacity style={styles.headerAction}>
-          <Download size={20} color={COLORS.primary} />
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity 
+            style={styles.headerActionButton}
+            onPress={loadPaymentHistory}
+            disabled={isLoading}
+          >
+            <Receipt size={20} color={isLoading ? COLORS.textSecondary : COLORS.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.headerActionButton}
+            onPress={handleExportAll}
+          >
+            <Download size={20} color={COLORS.primary} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {renderSummaryCards()}
-        {renderSearchAndFilters()}
-        {renderFilters()}
-        {renderQuickActions()}
+        {error && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
+        
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <Text style={styles.loadingText}>Loading billing history...</Text>
+          </View>
+        ) : (
+          <>
+            {renderSummaryCards()}
+            {renderSearchAndFilters()}
+            {renderFilters()}
+            {renderQuickActions()}
+          </>
+        )}
         
         <View style={styles.billingList}>
           <Text style={styles.sectionTitle}>Payment History</Text>
@@ -437,10 +580,10 @@ export default function BillingHistoryScreen() {
               <Text style={styles.emptyStateTitle}>No billing records found</Text>
               <Text style={styles.emptyStateSubtitle}>
                 {searchQuery ? 'Try adjusting your search terms' : 
-                 billingData.length === 0 ? 'Book your first appointment to see payment history' :
+                 realPaymentHistory.length === 0 ? 'Complete your first appointment payment to see billing history' :
                  'Your payment history will appear here'}
               </Text>
-              {billingData.length === 0 && (
+              {realPaymentHistory.length === 0 && !searchQuery && (
                 <TouchableOpacity
                   style={styles.scheduleButton}
                   onPress={() => router.push('/(patient)/patient-appointments/new')}
@@ -482,7 +625,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.textPrimary,
   },
-  headerAction: {
+  headerActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  headerActionButton: {
     width: 40,
     height: 40,
     justifyContent: 'center',
@@ -734,5 +881,27 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: SIZES.md,
     fontWeight: '600',
+  },
+  errorContainer: {
+    backgroundColor: COLORS.transparentError,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: COLORS.error,
+  },
+  errorText: {
+    color: COLORS.error,
+    fontSize: SIZES.sm,
+    textAlign: 'center',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    fontSize: SIZES.md,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
   },
 });

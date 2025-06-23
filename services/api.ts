@@ -22,17 +22,70 @@ class ApiService {
     this.baseURL = API_BASE_URL;
   }
 
-  // Get stored auth token
-  private async getAuthToken(): Promise<string | null> {
+  // Get stored auth tokens
+  private async getAuthTokens(): Promise<{ token: string | null; refreshToken: string | null }> {
     try {
       const authData = await AsyncStorage.getItem('auth-storage');
+      
       if (authData) {
         const parsed = JSON.parse(authData);
-        return parsed.state?.token || null;
+        return {
+          token: parsed.state?.token || null,
+          refreshToken: parsed.state?.refreshToken || null
+        };
       }
+      
+      return { token: null, refreshToken: null };
+    } catch (error) {
+      console.error('Error getting auth tokens:', error);
+      return { token: null, refreshToken: null };
+    }
+  }
+
+  // Get stored auth token (backward compatibility)
+  private async getAuthToken(): Promise<string | null> {
+    const tokens = await this.getAuthTokens();
+    return tokens.token;
+  }
+
+  // Refresh access token using refresh token
+  private async refreshAccessToken(): Promise<string | null> {
+    try {
+      const tokens = await this.getAuthTokens();
+      if (!tokens.refreshToken) {
+        return null;
+      }
+
+      const response = await fetch(`${this.baseURL}/auth/refresh-token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ refreshToken: tokens.refreshToken }),
+      });
+
+      if (!response.ok) {
+        console.error('Token refresh failed:', response.status);
+        return null;
+      }
+
+      const data = await response.json();
+
+      if (data.success && data.data?.accessToken) {
+        // Update the stored token
+        const authData = await AsyncStorage.getItem('auth-storage');
+        if (authData) {
+          const parsed = JSON.parse(authData);
+          parsed.state.token = data.data.accessToken;
+          await AsyncStorage.setItem('auth-storage', JSON.stringify(parsed));
+          console.log('Access token refreshed successfully');
+          return data.data.accessToken;
+        }
+      }
+
       return null;
     } catch (error) {
-      console.error('Error getting auth token:', error);
+      console.error('Error refreshing token:', error);
       return null;
     }
   }
@@ -47,13 +100,16 @@ class ApiService {
       const token = await this.getAuthToken();
       if (token) {
         headers.Authorization = `Bearer ${token}`;
+        console.log('API: Using auth token:', token.substring(0, 20) + '...');
+      } else {
+        console.warn('API: No auth token available');
       }
     }
 
     return headers;
   }
 
-  // Generic API request method
+  // Generic API request method with auto token refresh
   private async request<T>(
     endpoint: string,
     options: RequestInit = {},
@@ -72,17 +128,89 @@ class ApiService {
       };
 
       console.log(`API Request: ${config.method || 'GET'} ${url}`);
+      if (config.body) {
+        console.log('Request Body:', config.body);
+      }
 
-      const response = await fetch(url, config);
-      const data = await response.json();
+      let response = await fetch(url, config);
+      console.log(`Response Status: ${response.status} ${response.statusText}`);
+      
+      // Clone response to read text if JSON parsing fails
+      const responseClone = response.clone();
+      let data;
+      try {
+        data = await response.json();
+        console.log('Response Data:', JSON.stringify(data, null, 2));
+      } catch (parseError) {
+        console.error('Failed to parse JSON response:', parseError);
+        try {
+          const rawText = await responseClone.text();
+          console.log('Raw response text:', rawText);
+        } catch (textError) {
+          console.error('Failed to read response as text:', textError);
+        }
+        throw new Error('Invalid JSON response from server');
+      }
+
+      // If we get a 401 and we have auth enabled, try to refresh the token
+      if (response.status === 401 && includeAuth) {
+        console.log('Received 401, attempting to refresh token...');
+        const tokens = await this.getAuthTokens();
+        
+        if (!tokens.token) {
+          console.log('No access token found - user needs to log in');
+          throw new Error('Authentication required - please log in');
+        }
+        
+        const newToken = await this.refreshAccessToken();
+        
+        if (newToken) {
+          // Retry the request with the new token
+          const newHeaders = await this.createHeaders(true);
+          const retryConfig: RequestInit = {
+            ...options,
+            headers: {
+              ...newHeaders,
+              ...options.headers,
+            },
+          };
+          
+          console.log(`Retrying API Request with refreshed token: ${retryConfig.method || 'GET'} ${url}`);
+          response = await fetch(url, retryConfig);
+          data = await response.json();
+          console.log(`Retry response: ${response.status} ${response.statusText}`);
+        } else {
+          console.log('Token refresh failed - user needs to log in again');
+          throw new Error('Session expired - please log in again');
+        }
+      }
 
       if (!response.ok) {
-        throw new Error(data.message || `HTTP error! status: ${response.status}`);
+        const errorMessage = data.message || data.error || `HTTP error! status: ${response.status}`;
+        console.error(`API Error Details:`, {
+          status: response.status,
+          statusText: response.statusText,
+          url: url,
+          method: config.method || 'GET',
+          responseData: data,
+          errorMessage
+        });
+        throw new Error(`[${response.status}] ${errorMessage}`);
       }
 
       return data;
     } catch (error) {
       console.error(`API Error on ${endpoint}:`, error);
+      
+      // Re-throw with more context if it's a network or timeout error
+      if (error instanceof Error) {
+        if (error.message.includes('fetch') || error.message.includes('network')) {
+          throw new Error('Network error. Please check your internet connection.');
+        } else if (error.message.includes('timeout')) {
+          throw new Error('Request timeout. Please try again.');
+        }
+      }
+      
       throw error;
     }
   }

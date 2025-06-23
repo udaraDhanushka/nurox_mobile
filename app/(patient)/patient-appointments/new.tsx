@@ -10,42 +10,25 @@ import { DatePickerModal } from '../../../components/ui/DatePickerModal';
 import { useAppointmentStore } from '../../../store/appointmentStore';
 import { Hospital, TokenSlot, AppointmentType } from '../../../types/appointment';
 import { appointmentService } from '../../../services/appointmentService';
+import { tokenService } from '../../../services/tokenService';
 import { useAuthStore } from '../../../store/authStore';
 
-const mockDoctors = [
-  {
-    id: '1',
-    name: 'Dr. Sarah Johnson',
-    specialty: 'Cardiologist',
-    image: 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?q=80&w=2070&auto=format&fit=crop',
-    rating: 4.9,
-    experience: '15 years',
-  },
-  {
-    id: '2',
-    name: 'Dr. Michael Chen',
-    specialty: 'Dermatologist',
-    image: 'https://images.unsplash.com/photo-1582750433449-648ed127bb54?q=80&w=1974&auto=format&fit=crop',
-    rating: 4.8,
-    experience: '12 years',
-  },
-  {
-    id: '3',
-    name: 'Dr. Emily Rodriguez',
-    specialty: 'Pediatrician',
-    image: 'https://images.unsplash.com/photo-1594824475317-d3e2b7b3e5e5?q=80&w=1974&auto=format&fit=crop',
-    rating: 4.9,
-    experience: '10 years',
-  }
-];
+interface Doctor {
+  id: string;
+  name: string;
+  specialty: string;
+  specializations?: string[]; // Multiple specializations
+  image: string;
+  rating: number;
+  experience: string;
+}
 
 const appointmentTypes: AppointmentType[] = [
   'Consultation',
-  'Follow-up',
+  'Follow-up', 
   'Routine Checkup',
-  'Specialist Consultation',
-  'Emergency',
-  'Vaccination'
+  'Specialist Visit',
+  'Emergency'
 ];
 
 // Common specializations for filtering
@@ -66,10 +49,10 @@ const specializations = [
 
 export default function NewAppointmentScreen() {
   const router = useRouter();
-  const { addAppointment, getHospitalsByDoctorId, getTokenAvailability } = useAppointmentStore();
+  const { addAppointment, getHospitalsByDoctorId } = useAppointmentStore();
   const { user } = useAuthStore();
   
-  const [selectedDoctor, setSelectedDoctor] = useState<typeof mockDoctors[0] | null>(null);
+  const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
   const [availableHospitals, setAvailableHospitals] = useState<Hospital[]>([]);
   const [selectedHospital, setSelectedHospital] = useState<Hospital | null>(null);
   const [selectedDate, setSelectedDate] = useState('');
@@ -81,12 +64,12 @@ export default function NewAppointmentScreen() {
   const [showHospitalDropdown, setShowHospitalDropdown] = useState(false);
   const [showDatePickerModal, setShowDatePickerModal] = useState(false);
   const [isBooking, setIsBooking] = useState(false);
-  const [apiDoctors, setApiDoctors] = useState([]);
+  const [apiDoctors, setApiDoctors] = useState<any[]>([]);
   const [isLoadingDoctors, setIsLoadingDoctors] = useState(false);
   const [doctorNameFilter, setDoctorNameFilter] = useState('');
   const [selectedSpecialization, setSelectedSpecialization] = useState('');
   const [showSpecializationDropdown, setShowSpecializationDropdown] = useState(false);
-  const [allDoctors, setAllDoctors] = useState([]); // Store all doctors for filtering
+  const [allDoctors, setAllDoctors] = useState<any[]>([]); // Store all doctors for filtering
 
   // Get current date in local timezone (Sri Lankan if device is set correctly)
   const getCurrentDate = () => {
@@ -134,6 +117,7 @@ export default function NewAppointmentScreen() {
           id: doctor.id,
           name: `${doctor.firstName} ${doctor.lastName}`,
           specialty: doctor.doctorProfile?.specialization || 'General Practice',
+          specializations: [doctor.doctorProfile?.specialization || 'General Practice'],
           image: doctor.profileImage || 'https://images.unsplash.com/photo-612349317150-e413f6a5b16d?q=80&w=2070&auto=format&fit=crop',
           rating: doctor.doctorProfile?.rating || 4.8,
           experience: doctor.doctorProfile?.experience ? `${doctor.doctorProfile.experience} years` : '5 years'
@@ -141,13 +125,13 @@ export default function NewAppointmentScreen() {
         setApiDoctors(transformedDoctors);
         setAllDoctors(transformedDoctors);
       } else {
-        // Use mock doctors as fallback
-        setAllDoctors(mockDoctors);
+        // No doctors found from API
+        setAllDoctors([]);
       }
     } catch (error) {
-      console.log('Failed to load doctors from API, using fallback data:', error);
-      // Keep using mock doctors as fallback
-      setAllDoctors(mockDoctors);
+      console.log('Failed to load doctors from API:', error);
+      // Set empty array when API fails
+      setAllDoctors([]);
     } finally {
       setIsLoadingDoctors(false);
     }
@@ -172,32 +156,43 @@ export default function NewAppointmentScreen() {
     }
   }, [selectedDoctor]);
 
-  // Better token availability logic with fallback
+  // Token availability logic using dedicated token service (patient-only)
   useEffect(() => {
-    if (selectedDoctor && selectedHospital && selectedDate) {
-      console.log('Fetching tokens for:', { 
-        doctorId: selectedDoctor.id, 
-        hospitalId: selectedHospital.id, 
-        date: selectedDate 
-      });
-      
-      let tokens = getTokenAvailability(selectedDoctor.id, selectedHospital.id, selectedDate);
-      
-      // If no tokens from store, generate mock tokens
-      if (!tokens || tokens.length === 0) {
-        console.log('No tokens from store, generating fallback tokens');
-        tokens = generateFallbackTokens();
+    const fetchTokenAvailability = async () => {
+      if (selectedDoctor && selectedHospital && selectedDate) {
+        console.log('Fetching tokens for:', { 
+          doctorId: selectedDoctor.id, 
+          hospitalId: selectedHospital.id, 
+          date: selectedDate 
+        });
+        
+        try {
+          // Use the dedicated token service for patients
+          const tokens = await tokenService.getTokenAvailability(
+            selectedDoctor.id, 
+            selectedDate, 
+            selectedHospital.totalTokens
+          );
+          
+          console.log('Available tokens:', tokens);
+          setAvailableTokens(tokens);
+          setSelectedToken(null);
+        } catch (error) {
+          console.error('Error fetching token availability:', error);
+          // Fallback to mock tokens if service fails
+          const fallbackTokens = generateFallbackTokens();
+          setAvailableTokens(fallbackTokens);
+          setSelectedToken(null);
+        }
       }
-      
-      console.log('Available tokens:', tokens);
-      setAvailableTokens(tokens);
-      setSelectedToken(null);
-    }
+    };
+
+    fetchTokenAvailability();
   }, [selectedDoctor, selectedHospital, selectedDate]);
 
   // Filter doctors based on name and specialization
   const filteredDoctors = React.useMemo(() => {
-    let doctors = allDoctors.length > 0 ? allDoctors : mockDoctors;
+    let doctors = allDoctors;
     
     // Filter by name
     if (doctorNameFilter.trim()) {
@@ -290,25 +285,25 @@ export default function NewAppointmentScreen() {
       Alert.alert('Error', 'User not authenticated. Please log in again.');
       return;
     }
+    
+    console.log('Current user for appointment booking:', {
+      id: user.id,
+      email: user.email,
+      role: user.role
+    });
 
     setIsBooking(true);
 
     try {
-      // Convert 12-hour time format to 24-hour format and create proper ISO string
-      const convertTo24Hour = (time12h: string) => {
-        const [time, modifier] = time12h.split(' ');
-        let [hours, minutes] = time.split(':').map(num => parseInt(num));
-        
-        if (modifier === 'PM' && hours !== 12) {
-          hours += 12;
-        } else if (modifier === 'AM' && hours === 12) {
-          hours = 0;
-        }
-        
-        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-      };
+      // Validate token selection using token service
+      const tokenValidation = tokenService.validateTokenSelection(selectedToken);
+      if (!tokenValidation.isValid) {
+        throw new Error(tokenValidation.error);
+      }
 
-      const time24 = convertTo24Hour(selectedToken.time);
+      // Convert token time to 24-hour format using token service
+      const time24 = tokenService.convertTokenTimeTo24Hour(selectedToken.time);
+      // Create appointment date by combining date and time strings properly
       const appointmentDateTime = `${selectedDate}T${time24}:00.000Z`;
       
       console.log('Debug appointment date conversion:');
@@ -317,18 +312,54 @@ export default function NewAppointmentScreen() {
       console.log('time24:', time24);
       console.log('appointmentDateTime:', appointmentDateTime);
       console.log('Date validation:', new Date(appointmentDateTime).toString());
+      console.log('Appointment type transformation:', {
+        original: selectedType,
+        transformed: selectedType.toUpperCase().replace(/[\s-]+/g, '_')
+      });
       
-      // Prepare API request data - only include notes if it has content
-      const appointmentData = {
+      // Validate appointment date is valid
+      const dateCheck = new Date(appointmentDateTime);
+      if (isNaN(dateCheck.getTime())) {
+        throw new Error('Invalid appointment date/time. Please select a different time slot.');
+      }
+      
+      // Validate date is not in the past (with some tolerance for timezone differences)
+      const now = new Date();
+      const appointmentDate = new Date(appointmentDateTime);
+      if (appointmentDate < new Date(now.getTime() - 24 * 60 * 60 * 1000)) { // Allow 24 hours tolerance
+        throw new Error('Cannot book appointments in the past. Please select a future date.');
+      }
+
+      // Prepare API request data - match backend expectations
+      const appointmentData: any = {
+        // patientId is automatically set by backend from authenticated user (req.user.id)
         doctorId: selectedDoctor.id,
-        type: selectedType.toUpperCase().replace(/\s+/g, '_') as any, // Transform to match backend enum
+        type: selectedType.toUpperCase().replace(/[\s-]+/g, '_'), // Transform to match backend enum (CONSULTATION, FOLLOW_UP, etc.)
         title: `${selectedType} with ${selectedDoctor.name}`,
-        description: notes || `${selectedType} appointment`,
+        description: notes?.trim() || `${selectedType} appointment`,
         appointmentDate: appointmentDateTime,
         duration: 30, // Default 30 minutes
+        location: selectedHospital.name, // Hospital location
         isVirtual: false,
-        ...(notes && notes.trim() && { notes: notes.trim() }) // Only include notes if it has actual content
+        tokenNumber: selectedToken.tokenNumber // Include selected token number
+        // status is automatically set to 'PENDING' by backend controller
       };
+
+      // Only add notes if they exist and have content
+      if (notes && notes.trim()) {
+        appointmentData.notes = notes.trim();
+      }
+      
+      // Validate required fields (patientId is handled by backend from authenticated user)
+      if (!appointmentData.doctorId || !appointmentData.type || !appointmentData.appointmentDate || !appointmentData.tokenNumber) {
+        console.error('Missing required fields:', {
+          doctorId: !!appointmentData.doctorId,
+          type: !!appointmentData.type,
+          appointmentDate: !!appointmentData.appointmentDate,
+          tokenNumber: !!appointmentData.tokenNumber
+        });
+        throw new Error('Missing required appointment information. Please try again.');
+      }
 
       console.log('Creating appointment with data:', appointmentData);
       
@@ -354,7 +385,7 @@ export default function NewAppointmentScreen() {
         estimatedTime: selectedToken.time,
         duration: '30 min',
         type: selectedType as AppointmentType,
-        status: 'pending' as const,
+        status: 'confirmed' as const,
         paymentId: undefined,
         notes
       };
@@ -363,8 +394,8 @@ export default function NewAppointmentScreen() {
       addAppointment(localAppointment);
       
       Alert.alert(
-        'Appointment Confirmed! 🎉',
-        `Your appointment has been scheduled:\n\nDoctor: ${selectedDoctor.name}\nDate: ${selectedDate}\nToken: #${selectedToken.tokenNumber}\nTime: ${selectedToken.time}\n\nProceed to payment to complete your booking.`,
+        'Appointment Booked! 🎉',
+        `Your appointment has been scheduled:\n\nDoctor: ${selectedDoctor.name}\nDate: ${selectedDate}\nToken: #${selectedToken.tokenNumber}\nTime: ${selectedToken.time}\n\nNote: This appointment will be visible to your doctor only after payment confirmation.`,
         [
           {
             text: 'Proceed to Payment',
@@ -389,9 +420,17 @@ export default function NewAppointmentScreen() {
       );
     } catch (error) {
       console.error('Failed to create appointment:', error);
+      
+      let errorMessage = 'Failed to book appointment. Please try again.';
+      
+      if (error instanceof Error) {
+        // Use the specific error message from the service
+        errorMessage = error.message;
+      }
+      
       Alert.alert(
         'Booking Failed',
-        'Failed to book appointment. Please try again.',
+        errorMessage,
         [
           { text: 'OK' }
         ]
@@ -537,6 +576,12 @@ export default function NewAppointmentScreen() {
             <View style={styles.doctorInfo}>
               <Text style={styles.doctorName}>{doctor.name}</Text>
               <Text style={styles.doctorSpecialty}>{doctor.specialty}</Text>
+              {/* Show additional specializations if available */}
+              {doctor.specializations && doctor.specializations.length > 1 && (
+                <Text style={styles.additionalSpecialties}>
+                  Also: {doctor.specializations.filter((spec: string) => spec !== doctor.specialty).join(', ')}
+                </Text>
+              )}
               <Text style={styles.doctorDetails}>
                 ⭐ {doctor.rating} • {doctor.experience}
               </Text>
@@ -974,6 +1019,12 @@ const styles = StyleSheet.create({
     fontSize: SIZES.sm,
     color: COLORS.primary,
     fontWeight: '500',
+    marginBottom: 4,
+  },
+  additionalSpecialties: {
+    fontSize: SIZES.xs,
+    color: COLORS.textSecondary,
+    fontStyle: 'italic',
     marginBottom: 4,
   },
   doctorDetails: {

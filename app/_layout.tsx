@@ -1,12 +1,14 @@
 import { useFonts } from "expo-font";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
+import * as Linking from "expo-linking";
 import { StatusBar } from 'react-native';
 import { useEffect } from "react";
 import { useAuthStore } from "../store/authStore";
 import { useSocket } from "../hooks/useSocket";
 import ErrorBoundary from "./error-boundary";
 import { COLORS } from "./constants/theme";
+import { parseUrlParams, isPaymentDeepLink } from "../utils/urlUtils";
 
 export const unstable_settings = {
   // Ensure that reloading on `/modal` keeps a back button present.
@@ -72,6 +74,43 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     }
   }, [loaded]);
+
+  // Handle deep links
+  useEffect(() => {
+    const handleDeepLink = (url: string) => {
+      console.log('Deep link received:', url);
+      
+      if (isPaymentDeepLink(url)) {
+        const params = parseUrlParams(url);
+        
+        if (url.includes('/payments/success')) {
+          router.push({
+            pathname: '/(patient)/payment-success',
+            params: params as any
+          });
+        } else if (url.includes('/payments/failure')) {
+          router.push({
+            pathname: '/(patient)/payment-failure', 
+            params: params as any
+          });
+        }
+      }
+    };
+
+    // Handle app launch via deep link
+    Linking.getInitialURL().then((url) => {
+      if (url) {
+        handleDeepLink(url);
+      }
+    });
+
+    // Handle deep links while app is running
+    const subscription = Linking.addEventListener('url', ({ url }) => {
+      handleDeepLink(url);
+    });
+
+    return () => subscription?.remove();
+  }, [router]);
 
   if (!loaded) {
     return null;

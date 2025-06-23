@@ -648,6 +648,52 @@ export interface MedicalStoreActions {
   clearUploadHistory: (prescriptionId?: string) => void;
 }
 
+// Lab Test Request types
+export interface LabTestRequest {
+  id: string;
+  patientId: string;
+  patientName: string;
+  doctorId: string;
+  doctorName: string;
+  requestedTests: string[];
+  priority: 'routine' | 'urgent' | 'stat';
+  clinicalNotes?: string;
+  symptoms?: string;
+  requestDate: string;
+  expectedDate?: string;
+  status: 'pending' | 'approved' | 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+  assignedTestCenter?: {
+    id: string;
+    name: string;
+    address: string;
+  };
+  labReportId?: string; // Links to the actual lab report when completed
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface LabTestTemplate {
+  id: string;
+  name: string;
+  tests: string[];
+  description: string;
+  category: string;
+  preparationInstructions?: string[];
+  fastingRequired?: boolean;
+  estimatedTime?: string;
+  price?: number;
+}
+
+export interface LabTestRequestData {
+  patientId: string;
+  patientName: string;
+  requestedTests: string[];
+  priority: 'routine' | 'urgent' | 'stat';
+  clinicalNotes?: string;
+  symptoms?: string;
+  expectedDate?: string;
+}
+
 // Error types
 export interface AppError {
   code: string;

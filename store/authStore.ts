@@ -21,6 +21,9 @@ interface AuthStore extends AuthState {
   getUserDisplayName: () => string;
   getUserRole: () => UserRole | null;
   getUserLanguage: () => Language | undefined;
+  // Auth status helpers
+  isAuthenticated: () => boolean;
+  forceLogout: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthStore>()(
@@ -28,6 +31,7 @@ export const useAuthStore = create<AuthStore>()(
     (set, get) => ({
       user: null,
       token: null,
+      refreshToken: null,
       isLoading: false,
       error: null,
       
@@ -43,6 +47,7 @@ export const useAuthStore = create<AuthStore>()(
           set({ 
             user: authResponse.user, 
             token: authResponse.accessToken, 
+            refreshToken: authResponse.refreshToken,
             isLoading: false 
           });
           console.log('Auth Store: State updated successfully');
@@ -62,6 +67,7 @@ export const useAuthStore = create<AuthStore>()(
           set({ 
             user: authResponse.user, 
             token: authResponse.accessToken, 
+            refreshToken: authResponse.refreshToken,
             isLoading: false 
           });
           return Promise.resolve();
@@ -80,7 +86,7 @@ export const useAuthStore = create<AuthStore>()(
           await authService.logout();
           
           // Clear all auth data
-          set({ user: null, token: null, error: null, isLoading: false });
+          set({ user: null, token: null, refreshToken: null, error: null, isLoading: false });
           
           // Clear the persisted storage completely
           await AsyncStorage.removeItem('auth-storage');
@@ -90,7 +96,7 @@ export const useAuthStore = create<AuthStore>()(
         } catch (error) {
           console.error('Logout error:', error);
           // Even if there's an error clearing storage, clear the state
-          set({ user: null, token: null, error: null, isLoading: false });
+          set({ user: null, token: null, refreshToken: null, error: null, isLoading: false });
         }
       },
       
@@ -182,12 +188,35 @@ export const useAuthStore = create<AuthStore>()(
       getUserLanguage: () => {
         const { user } = get();
         return user?.language;
+      },
+
+      // Check if user is properly authenticated (matches app layout logic)
+      isAuthenticated: () => {
+        const { user, token } = get();
+        return !!(user && token);
+      },
+
+      // Force logout and clear all data (useful for debugging)
+      forceLogout: async () => {
+        try {
+          console.log('Force logout initiated');
+          
+          // Clear all auth data
+          set({ user: null, token: null, refreshToken: null, error: null, isLoading: false });
+          
+          // Clear the persisted storage completely
+          await AsyncStorage.removeItem('auth-storage');
+          
+          console.log('Force logout completed');
+        } catch (error) {
+          console.error('Force logout error:', error);
+        }
       }
     }),
     {
       name: 'auth-storage',
       storage: createJSONStorage(() => AsyncStorage),
-      partialize: (state) => ({ user: state.user, token: state.token }),
+      partialize: (state) => ({ user: state.user, token: state.token, refreshToken: state.refreshToken }),
     }
   )
 );

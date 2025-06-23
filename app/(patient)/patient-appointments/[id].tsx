@@ -44,9 +44,7 @@ export default function AppointmentDetailsScreen() {
     switch (status) {
       case 'confirmed':
         return COLORS.success;
-      case 'pending':
-        return COLORS.warning;
-      case 'cancelled':
+      case 'canceled':
         return COLORS.error;
       case 'completed':
         return COLORS.primary;
@@ -68,7 +66,7 @@ export default function AppointmentDetailsScreen() {
           text: 'Yes, Cancel',
           style: 'destructive',
           onPress: () => {
-            updateAppointment(appointment.id, { status: 'cancelled' });
+            updateAppointment(appointment.id, { status: 'canceled' });
             Alert.alert('Appointment Cancelled', 'Your appointment has been cancelled.');
             router.back();
           }
@@ -78,7 +76,27 @@ export default function AppointmentDetailsScreen() {
   };
 
   const handleReschedule = () => {
-    Alert.alert('Reschedule', 'Reschedule functionality would be implemented here.');
+    if (appointment.status === 'canceled') {
+      Alert.alert(
+        'Reschedule Appointment',
+        'This will require a 5% service charge. Do you want to proceed with rescheduling?',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel'
+          },
+          {
+            text: 'Proceed',
+            onPress: () => {
+              // Navigate to reschedule flow with 5% service charge
+              router.push(`/(patient)/patient-appointments/reschedule/${appointment.id}`);
+            }
+          }
+        ]
+      );
+    } else {
+      Alert.alert('Reschedule', 'Reschedule functionality would be implemented here.');
+    }
   };
 
   return (
@@ -232,21 +250,21 @@ export default function AppointmentDetailsScreen() {
             </>
           )}
 
-          {appointment.status === 'pending' && (
-            <Button
-              title="Cancel Request"
-              variant="outline"
-              onPress={handleCancelAppointment}
-              style={styles.cancelButton}
-              icon={<X size={20} color={COLORS.error} />}
-            />
-          )}
 
           {appointment.status === 'completed' && (
             <Button
               title="Book Follow-up"
               onPress={() => router.push('/(patient)/patient-appointments/new')}
               style={styles.followUpButton}
+            />
+          )}
+
+          {appointment.status === 'canceled' && (
+            <Button
+              title="Reschedule (+5% service charge)"
+              onPress={handleReschedule}
+              style={styles.rescheduleButton}
+              icon={<Edit size={20} color={COLORS.primary} />}
             />
           )}
         </View>

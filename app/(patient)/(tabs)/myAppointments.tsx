@@ -28,13 +28,12 @@ export default function AppointmentsScreen() {
     
     switch (selectedFilter) {
       case 'upcoming':
-        return (appointmentDate >= today && appointment.status !== 'cancelled') || 
-               appointment.status === 'pending' || 
-               appointment.status === 'confirmed';
+        return appointmentDate >= today && appointment.status === 'confirmed';
       case 'past':
-        return appointmentDate < today || appointment.status === 'completed';
-      case 'cancelled':
-        return appointment.status === 'cancelled';
+        return (appointmentDate < today && appointment.status === 'confirmed') || 
+               appointment.status === 'completed';
+      case 'canceled':
+        return appointment.status === 'canceled';
       default:
         return true;
     }
@@ -60,13 +59,11 @@ export default function AppointmentsScreen() {
       
       switch (filter) {
         case 'upcoming':
-          return (appointmentDate >= today && appointment.status !== 'cancelled') || 
-                 appointment.status === 'pending' || 
-                 appointment.status === 'confirmed';
+          return appointmentDate >= today && appointment.status === 'confirmed';
         case 'past':
           return appointmentDate < today || appointment.status === 'completed';
-        case 'cancelled':
-          return appointment.status === 'cancelled';
+        case 'canceled':
+          return appointment.status === 'canceled';
         default:
           return true;
       }
@@ -95,7 +92,7 @@ export default function AppointmentsScreen() {
         {[
           { key: 'upcoming', label: 'Upcoming' },
           { key: 'past', label: 'Past' },
-          { key: 'cancelled', label: 'Cancelled' }
+          { key: 'canceled', label: 'Canceled' }
         ].map((filter) => (
           <TouchableOpacity
             key={filter.key}
@@ -147,14 +144,14 @@ export default function AppointmentsScreen() {
                 <Text style={styles.emptyStateText}>
                   {selectedFilter === 'upcoming' ? 'No upcoming appointments' : 
                    selectedFilter === 'past' ? 'No past appointments' : 
-                   'No cancelled appointments'}
+                   'No canceled appointments'}
                 </Text>
                 <Text style={styles.emptyStateSubtext}>
                   {selectedFilter === 'upcoming' 
                     ? 'Schedule your first appointment to get started'
                     : selectedFilter === 'past'
                     ? 'Your completed appointments will appear here'
-                    : 'Your cancelled appointments will appear here'
+                    : 'Your canceled appointments will appear here'
                   }
                 </Text>
                 {selectedFilter === 'upcoming' && (

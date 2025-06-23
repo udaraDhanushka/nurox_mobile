@@ -29,19 +29,6 @@ export default function DoctorTabLayout() {
           fontWeight: '500',
         },
         headerShown: false,
-        headerTitleStyle: {
-          fontSize: 18,
-          fontWeight: 'bold',
-          color: COLORS.textPrimary,
-        },
-        headerRight: () => (
-          <TouchableOpacity
-            onPress={() => router.push('/(doctor)/profile')}
-            style={{ marginRight: 20 }}
-          >
-            <User size={24} color={COLORS.primary} />
-          </TouchableOpacity>
-        ),
       })}
     >
       <Tabs.Screen
