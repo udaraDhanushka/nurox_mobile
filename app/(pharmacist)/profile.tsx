@@ -92,7 +92,7 @@ export default function PharmacistProfileScreen() {
       });
 
       if (!result.canceled && result.assets[0].uri) {
-        updateUser({ 
+        await updateUser({ 
           profileImage: result.assets[0].uri 
         });
       }
@@ -122,12 +122,7 @@ export default function PharmacistProfileScreen() {
       });
 
       if (!result.canceled && result.assets[0].uri) {
-        updateUser({ 
-          id: user.id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          role: user.role,
+        await updateUser({ 
           profileImage: result.assets[0].uri 
         });
       }

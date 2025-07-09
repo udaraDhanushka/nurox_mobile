@@ -90,11 +90,24 @@ class ApiService {
     }
   }
 
+  // Force logout - clear all auth data
+  private async forceLogout(): Promise<void> {
+    try {
+      console.log('API: Force logout initiated');
+      await AsyncStorage.removeItem('auth-storage');
+      console.log('API: Auth storage cleared');
+    } catch (error) {
+      console.error('API: Error during force logout:', error);
+    }
+  }
+
   // Create headers with auth token
   private async createHeaders(includeAuth = true): Promise<HeadersInit> {
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
     };
+
+    console.log('API: Creating headers with includeAuth:', includeAuth);
 
     if (includeAuth) {
       const token = await this.getAuthToken();
@@ -104,6 +117,8 @@ class ApiService {
       } else {
         console.warn('API: No auth token available');
       }
+    } else {
+      console.log('API: Not including auth header');
     }
 
     return headers;
@@ -128,6 +143,7 @@ class ApiService {
       };
 
       console.log(`API Request: ${config.method || 'GET'} ${url}`);
+      console.log('Request Headers:', JSON.stringify(config.headers, null, 2));
       if (config.body) {
         console.log('Request Body:', config.body);
       }
@@ -157,8 +173,10 @@ class ApiService {
         console.log('Received 401, attempting to refresh token...');
         const tokens = await this.getAuthTokens();
         
-        if (!tokens.token) {
-          console.log('No access token found - user needs to log in');
+        if (!tokens.refreshToken) {
+          console.log('No refresh token found - user needs to log in');
+          // Force logout
+          await this.forceLogout();
           throw new Error('Authentication required - please log in');
         }
         
@@ -181,6 +199,8 @@ class ApiService {
           console.log(`Retry response: ${response.status} ${response.statusText}`);
         } else {
           console.log('Token refresh failed - user needs to log in again');
+          // Force logout when refresh fails
+          await this.forceLogout();
           throw new Error('Session expired - please log in again');
         }
       }
