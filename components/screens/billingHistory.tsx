@@ -21,6 +21,7 @@ import { COLORS, SIZES, SHADOWS } from '@/constants/theme';
 import { Button } from '@/components/Button';
 import { useAppointmentStore } from '@/store/appointmentStore';
 import paymentService, { PaymentHistoryItem, PaymentHistoryResponse } from '@/services/paymentService';
+import { formatCurrency } from '@/utils/currencyUtils';
 
 interface BillingItem {
   id: string;
@@ -221,7 +222,7 @@ export default function BillingHistoryScreen() {
   const handleViewDetails = (item: BillingItem) => {
     Alert.alert(
       'Payment Details',
-      `Receipt ID: ${item.receiptId}\nDoctor: ${item.doctorName}\nHospital: ${item.hospitalName}\nConsultation Fee: $${item.consultationFee.toFixed(2)}\nHospital Fee: $${item.hospitalFee.toFixed(2)}\nTax: $${item.tax.toFixed(2)}\nTotal Amount: $${item.amount.toFixed(2)}\nStatus: ${item.status.toUpperCase()}\nDate: ${new Date(item.date).toLocaleDateString()}${item.paymentId ? `\nPayment ID: ${item.paymentId}` : ''}`,
+      `Receipt ID: ${item.receiptId}\nDoctor: ${item.doctorName}\nHospital: ${item.hospitalName}\nConsultation Fee: ${formatCurrency(item.consultationFee)}\nHospital Fee: ${formatCurrency(item.hospitalFee)}\nTax: ${formatCurrency(item.tax)}\nTotal Amount: ${formatCurrency(item.amount)}\nStatus: ${item.status.toUpperCase()}\nDate: ${new Date(item.date).toLocaleDateString()}${item.paymentId ? `\nPayment ID: ${item.paymentId}` : ''}`,
       [
         { text: 'OK' },
         { 
@@ -269,13 +270,13 @@ export default function BillingHistoryScreen() {
     <View style={styles.summaryContainer}>
       <View style={styles.summaryCard}>
         <DollarSign size={24} color={COLORS.primary} />
-        <Text style={styles.summaryValue}>${getTotalSpent().toFixed(2)}</Text>
+        <Text style={styles.summaryValue}>{formatCurrency(getTotalSpent())}</Text>
         <Text style={styles.summaryLabel}>Total Spent</Text>
       </View>
       
       <View style={styles.summaryCard}>
         <TrendingUp size={24} color={COLORS.success} />
-        <Text style={styles.summaryValue}>${getThisMonthSpent().toFixed(2)}</Text>
+        <Text style={styles.summaryValue}>{formatCurrency(getThisMonthSpent())}</Text>
         <Text style={styles.summaryLabel}>This Month</Text>
       </View>
       
@@ -352,7 +353,7 @@ export default function BillingHistoryScreen() {
         </View>
         
         <View style={styles.billingAmountSection}>
-          <Text style={styles.amount}>${item.amount.toFixed(2)}</Text>
+          <Text style={styles.amount}>{formatCurrency(item.amount)}</Text>
           <View style={[
             styles.statusBadge,
             { backgroundColor: `${getStatusColor(item.status)}20` }
@@ -396,7 +397,7 @@ export default function BillingHistoryScreen() {
           <View style={styles.detailRow}>
             <Shield size={16} color={COLORS.success} />
             <Text style={styles.insuranceText}>
-              Insurance covered: ${item.insuranceCovered.toFixed(2)}
+              Insurance covered: {formatCurrency(item.insuranceCovered)}
             </Text>
           </View>
         )}

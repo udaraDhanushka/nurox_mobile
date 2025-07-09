@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { XCircle, ArrowLeft, CreditCard, RefreshCw, Phone, Mail } from 'lucide-react-native';
 import { COLORS, SIZES, SHADOWS } from '@/constants/theme';
 import { Button } from '@/components/Button';
+import { formatCurrency } from '@/utils/currencyUtils';
 
 export default function PaymentFailureScreen() {
   const router = useRouter();
@@ -14,7 +15,7 @@ export default function PaymentFailureScreen() {
   const errorData = {
     errorCode: (params.errorCode as string) || 'PAYMENT_FAILED',
     errorMessage: (params.errorMessage as string) || 'Your payment could not be processed at this time.',
-    amount: parseFloat((params.amount as string) || '275.00'),
+    amount: parseFloat((params.amount as string) || '15000.00'),
     doctorName: (params.doctorName as string) || 'Dr. Sarah Johnson',
     specialty: (params.specialty as string) || 'Cardiologist',
     date: (params.date as string) || '2025-06-06',
@@ -137,7 +138,7 @@ export default function PaymentFailureScreen() {
       
       <View style={styles.detailRow}>
         <Text style={styles.detailLabel}>Amount</Text>
-        <Text style={styles.detailValue}>${errorData.amount.toFixed(2)}</Text>
+        <Text style={styles.detailValue}>{formatCurrency(errorData.amount)}</Text>
       </View>
       
       {errorData.transactionId && (
