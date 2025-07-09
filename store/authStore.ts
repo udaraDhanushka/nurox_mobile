@@ -11,7 +11,7 @@ interface AuthStore extends AuthState {
   logout: () => Promise<void>;
   resetPassword: (data: ResetPasswordData) => Promise<void>;
   setNewPassword: (data: NewPasswordData) => Promise<void>;
-  updateUser: (user: User) => void;
+  updateUser: (user: Partial<User>) => Promise<void>;
   updateLanguage: (language: Language) => void;
   clearError: () => void;
   // Role-based helpers
@@ -135,6 +135,7 @@ export const useAuthStore = create<AuthStore>()(
           set({ user: updated });
         } catch (error) {
           console.error('Update user error:', error);
+          throw error;
         }
       },
       

@@ -87,7 +87,7 @@ export default function ProfileScreen() {
             });
 
             if (!result.canceled && result.assets[0].uri) {
-        updateUser({ 
+        await updateUser({ 
           profileImage: result.assets[0].uri 
         });
             }
@@ -117,7 +117,7 @@ export default function ProfileScreen() {
             });
 
             if (!result.canceled && result.assets[0].uri) {
-        updateUser({ 
+        await updateUser({ 
           profileImage: result.assets[0].uri 
         });
             }
