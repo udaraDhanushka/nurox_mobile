@@ -9,6 +9,7 @@ import { StripeProvider, useStripe } from '@stripe/stripe-react-native';
 import { STRIPE_CONFIG } from '@/config/stripe';
 import paymentService, { CreatePaymentIntentRequest, PaymentIntent } from '@/services/paymentService';
 import { useAuthStore } from '@/store/authStore';
+import { formatCurrency, rupeesToCents } from '@/utils/currencyUtils';
 
 interface PaymentMethod {
   id: string;
@@ -85,7 +86,7 @@ function PaymentScreenContent() {
     notes: params.notes as string || '',
     // Calculate fees based on appointment type and doctor specialty
     consultationFee: calculateConsultationFee(params.specialty as string, params.appointmentType as string),
-    hospitalFee: 25.00,
+    hospitalFee: 2500.00,
     tax: 0, // Will be calculated below
     total: 0 // Will be calculated below
   };
@@ -98,13 +99,13 @@ function PaymentScreenContent() {
   // Function to calculate consultation fee based on specialty and appointment type
   function calculateConsultationFee(specialty: string, appointmentType: string): number {
     const baseFeesBySpecialty: { [key: string]: number } = {
-      'Cardiologist': 200.00,
-      'Dermatologist': 150.00,
-      'Pediatrician': 120.00,
-      'Orthopedic': 180.00,
-      'Neurology': 250.00,
-      'ENT Specialist': 140.00,
-      'General Physician': 100.00,
+      'Cardiologist': 15000.00,
+      'Dermatologist': 12000.00,
+      'Pediatrician': 8000.00,
+      'Orthopedic': 13000.00,
+      'Neurology': 18000.00,
+      'ENT Specialist': 10000.00,
+      'General Physician': 7000.00,
     };
     
     const typeMultipliers: { [key: string]: number } = {
@@ -115,7 +116,7 @@ function PaymentScreenContent() {
       'Emergency': 1.5
     };
     
-    const baseFee = baseFeesBySpecialty[specialty] || 150.00;
+    const baseFee = baseFeesBySpecialty[specialty] || 10000.00;
     const multiplier = typeMultipliers[appointmentType] || 1.0;
     
     return Math.round(baseFee * multiplier * 100) / 100; // Round to 2 decimal places
@@ -149,8 +150,8 @@ function PaymentScreenContent() {
   const createPaymentIntent = async (): Promise<PaymentIntent | undefined> => {
     try {
       const paymentData: CreatePaymentIntentRequest = {
-        amount: Math.round(appointmentData.total * 100), // Convert to cents
-        currency: 'usd',
+        amount: rupeesToCents(appointmentData.total), // Convert to cents
+        currency: 'lkr',
         appointmentId: appointmentData.appointmentId,
         description: `Appointment with ${appointmentData.doctorName} - ${appointmentData.specialty}`,
         metadata: {
@@ -432,24 +433,24 @@ function PaymentScreenContent() {
         <Text style={styles.pricingLabel}>
           {appointmentData.appointmentType} Fee ({appointmentData.specialty})
         </Text>
-        <Text style={styles.pricingValue}>${appointmentData.consultationFee.toFixed(2)}</Text>
+        <Text style={styles.pricingValue}>{formatCurrency(appointmentData.consultationFee)}</Text>
       </View>
       
       <View style={styles.pricingRow}>
         <Text style={styles.pricingLabel}>Hospital Fee</Text>
-        <Text style={styles.pricingValue}>${appointmentData.hospitalFee.toFixed(2)}</Text>
+        <Text style={styles.pricingValue}>{formatCurrency(appointmentData.hospitalFee)}</Text>
       </View>
       
       <View style={styles.pricingRow}>
         <Text style={styles.pricingLabel}>Tax (10%)</Text>
-        <Text style={styles.pricingValue}>${appointmentData.tax.toFixed(2)}</Text>
+        <Text style={styles.pricingValue}>{formatCurrency(appointmentData.tax)}</Text>
       </View>
       
       <View style={styles.divider} />
       
       <View style={styles.totalRow}>
         <Text style={styles.totalLabel}>Total Amount</Text>
-        <Text style={styles.totalValue}>${appointmentData.total.toFixed(2)}</Text>
+        <Text style={styles.totalValue}>{formatCurrency(appointmentData.total)}</Text>
       </View>
     </View>
   );

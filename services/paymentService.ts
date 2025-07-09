@@ -92,7 +92,7 @@ class PaymentService {
     try {
       const response = await api.post<{data: PaymentIntent}>(API_ENDPOINTS.PAYMENTS.INTENT, {
         ...data,
-        currency: data.currency || 'usd',
+        currency: data.currency || 'lkr',
       });
       
       if (!response.success || !response.data) {

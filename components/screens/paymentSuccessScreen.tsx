@@ -6,6 +6,7 @@ import { CheckCircle, Calendar, User, Building, Clock, Receipt, ArrowRight } fro
 import { COLORS, SIZES, SHADOWS } from '@/constants/theme';
 import { Button } from '@/components/Button';
 import { useAppointmentStore } from '@/store/appointmentStore';
+import { formatCurrency } from '@/utils/currencyUtils';
 
 export default function PaymentSuccessScreen() {
   const router = useRouter();
@@ -15,7 +16,7 @@ export default function PaymentSuccessScreen() {
   // Handle both URL parameters and navigation parameters
   const paymentData = {
     transactionId: (params.transactionId as string) || 'TXN123456789',
-    amount: parseFloat((params.amount as string) || '275.00'),
+    amount: parseFloat((params.amount as string) || '15000.00'),
     doctorName: (params.doctorName as string) || 'Dr. Sarah Johnson',
     specialty: (params.specialty as string) || 'Cardiologist',
     hospitalName: (params.hospitalName as string) || 'Heart Care Institute',
@@ -79,7 +80,7 @@ export default function PaymentSuccessScreen() {
           
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Amount Paid</Text>
-            <Text style={styles.detailValue}>${paymentData.amount.toFixed(2)}</Text>
+            <Text style={styles.detailValue}>{formatCurrency(paymentData.amount)}</Text>
           </View>
           
           <View style={styles.detailRow}>
