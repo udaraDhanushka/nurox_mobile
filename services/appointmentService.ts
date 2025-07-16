@@ -222,7 +222,7 @@ class AppointmentService {
 
   // Update appointment
   async updateAppointment(id: string, updates: {
-    status?: AppointmentStatus;
+    status?: string; // Backend format status (e.g., 'CONFIRMED', 'COMPLETED', 'CANCELED')
     notes?: string;
     meetingLink?: string;
   }): Promise<Appointment> {
@@ -431,13 +431,13 @@ class AppointmentService {
 
   // Confirm appointment
   async confirmAppointment(id: string): Promise<Appointment> {
-    return this.updateAppointment(id, { status: 'CONFIRMED' as any });
+    return this.updateAppointment(id, { status: 'CONFIRMED' });
   }
 
   // Complete appointment
   async completeAppointment(id: string, notes?: string): Promise<Appointment> {
     return this.updateAppointment(id, { 
-      status: 'COMPLETED' as any,
+      status: 'COMPLETED',
       notes: notes || 'Appointment completed'
     });
   }

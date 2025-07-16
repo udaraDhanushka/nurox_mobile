@@ -1,8 +1,7 @@
 // Debug script to test login issue
 
-const fetch = require('node-fetch');
-
 async function testLogin() {
+  const { default: fetch } = await import('node-fetch');
   try {
     console.log('Testing login request...');
     
@@ -12,8 +11,8 @@ async function testLogin() {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        email: 'chamidu@patient.com',
-        password: 'Chamidu@123'
+        email: 'patient@nurox.com',
+        password: 'admin123456'
       })
     });
     

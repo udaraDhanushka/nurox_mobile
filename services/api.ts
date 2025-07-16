@@ -48,14 +48,44 @@ class ApiService {
     return tokens.token;
   }
 
+  // Check if a JWT token is expired
+  private isTokenExpired(token: string): boolean {
+    try {
+      console.log('API: Checking token expiration using atob method');
+      
+      // Explicitly check if atob is available
+      if (typeof atob === 'undefined') {
+        console.error('API: atob is not available in this environment');
+        return true;
+      }
+      
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const now = Math.floor(Date.now() / 1000);
+      const expired = payload.exp < now;
+      
+      console.log('API: Token validation result:', {
+        exp: payload.exp,
+        now: now,
+        expired: expired
+      });
+      
+      return expired;
+    } catch (error) {
+      console.error('API: Error checking token expiration:', error);
+      return true; // Assume expired if can't parse
+    }
+  }
+
   // Refresh access token using refresh token
   private async refreshAccessToken(): Promise<string | null> {
     try {
       const tokens = await this.getAuthTokens();
       if (!tokens.refreshToken) {
+        console.log('No refresh token available for refresh');
         return null;
       }
 
+      console.log('Attempting to refresh access token...');
       const response = await fetch(`${this.baseURL}/auth/refresh-token`, {
         method: 'POST',
         headers: {
@@ -64,8 +94,15 @@ class ApiService {
         body: JSON.stringify({ refreshToken: tokens.refreshToken }),
       });
 
+      console.log('Token refresh response status:', response.status);
+
       if (!response.ok) {
-        console.error('Token refresh failed:', response.status);
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Token refresh failed:', response.status, errorData);
+        
+        if (response.status === 401) {
+          console.log('Refresh token is expired or invalid');
+        }
         return null;
       }
 
@@ -90,12 +127,42 @@ class ApiService {
     }
   }
 
+  // Check if both tokens are expired and clear them if so
+  private async checkAndClearExpiredTokens(): Promise<boolean> {
+    try {
+      const tokens = await this.getAuthTokens();
+      
+      if (!tokens.token && !tokens.refreshToken) {
+        return false; // No tokens to check
+      }
+
+      const accessExpired = tokens.token ? this.isTokenExpired(tokens.token) : true;
+      const refreshExpired = tokens.refreshToken ? this.isTokenExpired(tokens.refreshToken) : true;
+
+      if (accessExpired && refreshExpired) {
+        console.log('API: Both tokens are expired, clearing auth data');
+        await this.forceLogout();
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      console.error('API: Error checking expired tokens:', error);
+      return false;
+    }
+  }
+
   // Force logout - clear all auth data
   private async forceLogout(): Promise<void> {
     try {
       console.log('API: Force logout initiated');
       await AsyncStorage.removeItem('auth-storage');
       console.log('API: Auth storage cleared');
+      
+      // Dispatch an event to notify the auth store
+      if (typeof window !== 'undefined' && window.dispatchEvent) {
+        window.dispatchEvent(new CustomEvent('forceLogout'));
+      }
     } catch (error) {
       console.error('API: Error during force logout:', error);
     }
@@ -112,6 +179,17 @@ class ApiService {
     if (includeAuth) {
       const token = await this.getAuthToken();
       if (token) {
+        // Temporarily disable token expiration check in headers
+        // TODO: Re-enable this after fixing the Buffer issue
+        // if (this.isTokenExpired(token)) {
+        //   console.warn('API: Access token is expired, not including in headers');
+        //   // Don't include expired token in headers
+        // } else {
+        //   headers.Authorization = `Bearer ${token}`;
+        //   console.log('API: Using auth token:', token.substring(0, 20) + '...');
+        // }
+        
+        // For now, just use the token without checking expiration
         headers.Authorization = `Bearer ${token}`;
         console.log('API: Using auth token:', token.substring(0, 20) + '...');
       } else {
@@ -131,6 +209,15 @@ class ApiService {
     includeAuth = true
   ): Promise<ApiResponse<T>> {
     try {
+      // Temporarily disable preemptive token checking to debug the issue
+      // TODO: Re-enable this after fixing the Buffer issue
+      // if (includeAuth) {
+      //   const expiredTokensCleared = await this.checkAndClearExpiredTokens();
+      //   if (expiredTokensCleared) {
+      //     throw new Error('Session expired - please log in again');
+      //   }
+      // }
+
       const url = `${this.baseURL}${endpoint}`;
       const headers = await this.createHeaders(includeAuth);
 
@@ -224,10 +311,12 @@ class ApiService {
       
       // Re-throw with more context if it's a network or timeout error
       if (error instanceof Error) {
-        if (error.message.includes('fetch') || error.message.includes('network')) {
-          throw new Error('Network error. Please check your internet connection.');
+        if (error.message.includes('fetch') || error.message.includes('network') || error.message.includes('ECONNREFUSED')) {
+          throw new Error('Unable to connect to server. Please check your internet connection and try again.');
         } else if (error.message.includes('timeout')) {
           throw new Error('Request timeout. Please try again.');
+        } else if (error.message.includes('ENOTFOUND')) {
+          throw new Error('Server not found. Please check your network connection.');
         }
       }
       
@@ -338,11 +427,51 @@ export const api = new ApiService();
 export const checkApiHealth = async (): Promise<boolean> => {
   try {
     const baseUrl = __DEV__ ? API_CONFIG.DEV_BASE_URL : API_CONFIG.PROD_BASE_URL;
-    const response = await fetch(`${baseUrl.replace('/api', '')}/health`);
+    const response = await fetch(`${baseUrl.replace('/api', '')}/health`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
     return response.ok;
   } catch (error) {
     console.error('API Health check failed:', error);
     return false;
+  }
+};
+
+// Enhanced health check with detailed response
+export const checkApiHealthDetailed = async (): Promise<{ 
+  isHealthy: boolean; 
+  error?: string; 
+  status?: number; 
+  baseUrl: string; 
+}> => {
+  try {
+    const baseUrl = __DEV__ ? API_CONFIG.DEV_BASE_URL : API_CONFIG.PROD_BASE_URL;
+    const healthUrl = `${baseUrl.replace('/api', '')}/health`;
+    
+    console.log('Checking API health at:', healthUrl);
+    
+    const response = await fetch(healthUrl, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    return {
+      isHealthy: response.ok,
+      status: response.status,
+      baseUrl: healthUrl,
+    };
+  } catch (error) {
+    console.error('API Health check failed:', error);
+    return {
+      isHealthy: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      baseUrl: __DEV__ ? API_CONFIG.DEV_BASE_URL : API_CONFIG.PROD_BASE_URL,
+    };
   }
 };
 
