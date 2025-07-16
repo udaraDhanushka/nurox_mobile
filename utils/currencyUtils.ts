@@ -68,7 +68,7 @@ export function parseCurrency(currencyString: string): number {
 }
 
 /**
- * Convert cents to rupees (for Stripe integration)
+ * Convert cents to rupees (for payment processing)
  * @param cents - Amount in cents
  * @returns Amount in rupees
  */
@@ -77,7 +77,7 @@ export function centsToRupees(cents: number): number {
 }
 
 /**
- * Convert rupees to cents (for Stripe integration)
+ * Convert rupees to cents (for payment processing)
  * @param rupees - Amount in rupees
  * @returns Amount in cents
  */

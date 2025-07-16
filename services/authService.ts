@@ -10,13 +10,30 @@ export interface AuthResponse {
 
 class AuthService {
   // User registration
-  async register(data: RegisterData): Promise<AuthResponse> {
+  async register(data: RegisterData & {
+    hospitalId?: string;
+    pharmacyId?: string;
+    laboratoryId?: string;
+    insuranceId?: string;
+    specialization?: string;
+    certifications?: string[];
+    specializations?: string[];
+  }): Promise<AuthResponse> {
     const response = await api.post<AuthResponse>('/auth/register', {
       email: data.email,
       password: data.password,
       firstName: data.firstName,
       lastName: data.lastName,
       role: data.role.toUpperCase(), // Convert to backend format
+      phone: data.phone,
+      dateOfBirth: data.dateOfBirth,
+      hospitalId: data.hospitalId,
+      pharmacyId: data.pharmacyId,
+      laboratoryId: data.laboratoryId,
+      insuranceId: data.insuranceId,
+      specialization: data.specialization,
+      certifications: data.certifications,
+      specializations: data.specializations,
     }, false); // No auth required for registration
 
     if (!response.success || !response.data) {

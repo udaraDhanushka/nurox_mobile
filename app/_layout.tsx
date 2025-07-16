@@ -24,7 +24,7 @@ export default function RootLayout() {
   });
   
   // Get the authentication state
-  const { token, user } = useAuthStore();
+  const { token, user, checkTokenExpiration } = useAuthStore();
   const segments = useSegments();
   const router = useRouter();
   
@@ -37,9 +37,20 @@ export default function RootLayout() {
 
     const inAuthGroup = segments[0] === "(auth)";
     
+    // Temporarily disable token expiration check to debug Buffer issue
+    // TODO: Re-enable this after fixing the Buffer issue
+    // const tokensExpired = checkTokenExpiration();
+    const tokensExpired = false;
     
     // Add a small delay to avoid race conditions during logout
     const timeoutId = setTimeout(() => {
+      // If tokens are expired, redirect to auth
+      if (tokensExpired) {
+        console.log('App: Tokens expired, redirecting to auth');
+        router.replace("/(auth)");
+        return;
+      }
+      
       // If user is authenticated and in auth group, redirect to appropriate dashboard
       if (token && user && inAuthGroup) {
         const userRole = user.role.toLowerCase();
@@ -60,7 +71,7 @@ export default function RootLayout() {
     }, 50); // Small delay to allow state to settle
 
     return () => clearTimeout(timeoutId);
-  }, [token, user, segments, loaded, router]);
+  }, [token, user, segments, loaded, router, checkTokenExpiration]);
 
   useEffect(() => {
     if (error) {

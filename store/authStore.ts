@@ -24,6 +24,7 @@ interface AuthStore extends AuthState {
   // Auth status helpers
   isAuthenticated: () => boolean;
   forceLogout: () => Promise<void>;
+  checkTokenExpiration: () => boolean;
 }
 
 export const useAuthStore = create<AuthStore>()(
@@ -212,6 +213,54 @@ export const useAuthStore = create<AuthStore>()(
         } catch (error) {
           console.error('Force logout error:', error);
         }
+      },
+
+      // Check if tokens are expired and clear them if so
+      checkTokenExpiration: () => {
+        const { token, refreshToken } = get();
+        
+        if (!token && !refreshToken) {
+          return false;
+        }
+
+        const isTokenExpired = (tokenString: string): boolean => {
+          try {
+            console.log('AuthStore: Checking token expiration using atob method');
+            
+            // Explicitly check if atob is available
+            if (typeof atob === 'undefined') {
+              console.error('AuthStore: atob is not available in this environment');
+              return true;
+            }
+            
+            const payload = JSON.parse(atob(tokenString.split('.')[1]));
+            const now = Math.floor(Date.now() / 1000);
+            const expired = payload.exp < now;
+            
+            console.log('AuthStore: Token validation result:', {
+              exp: payload.exp,
+              now: now,
+              expired: expired
+            });
+            
+            return expired;
+          } catch (error) {
+            console.error('AuthStore: Error checking token expiration:', error);
+            return true;
+          }
+        };
+
+        const accessExpired = token ? isTokenExpired(token) : true;
+        const refreshExpired = refreshToken ? isTokenExpired(refreshToken) : true;
+
+        if (accessExpired && refreshExpired) {
+          console.log('Both tokens are expired, clearing auth data');
+          set({ user: null, token: null, refreshToken: null, error: null, isLoading: false });
+          AsyncStorage.removeItem('auth-storage');
+          return true;
+        }
+
+        return false;
       }
     }),
     {

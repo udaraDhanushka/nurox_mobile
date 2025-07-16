@@ -7,6 +7,7 @@ import { COLORS, SIZES } from '../../constants/theme';
 import { Input } from '../../components/Input';
 import { Button } from '../../components/Button';
 import { useAuthStore } from '../../store/authStore';
+import { checkApiHealthDetailed } from '../../services/api';
 
 export default function LoginScreen() {
     const router = useRouter();
@@ -64,6 +65,29 @@ export default function LoginScreen() {
     const handleLogin = async () => {
         if (validateForm()) {
             try {
+                // First check if the server is reachable
+                const healthCheck = await checkApiHealthDetailed();
+                
+                if (!healthCheck.isHealthy) {
+                    console.error('Server health check failed:', healthCheck);
+                    
+                    // Show more specific error message
+                    const errorMessage = healthCheck.error?.includes('ECONNREFUSED') 
+                        ? 'Unable to connect to server. Please ensure the backend server is running and accessible.'
+                        : healthCheck.error?.includes('ENOTFOUND')
+                        ? 'Server not found. Please check your network connection.'
+                        : 'Server is not responding. Please try again later.';
+                    
+                    Alert.alert(
+                        'Connection Error',
+                        errorMessage,
+                        [
+                            { text: 'OK', style: 'default' }
+                        ]
+                    );
+                    return;
+                }
+                
                 await login({ email, password });
             } catch (err) {
                 console.error("Login error:", err);

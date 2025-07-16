@@ -56,11 +56,18 @@ export interface PaymentHistoryResponse {
   };
 }
 
-export interface PaymentIntent {
-  clientSecret: string;
+export interface PayHerePaymentData {
+  orderId: string;
   amount: number;
-  currency: string;
-  paymentIntentId: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  address: string;
+  city: string;
+  country: string;
+  hash: string;
+  items?: string;
 }
 
 export interface PaymentConfirmation {
@@ -73,35 +80,45 @@ export interface PaymentConfirmation {
   };
 }
 
-export interface CreatePaymentIntentRequest {
+export interface CreatePaymentRequest {
   amount: number;
   currency?: string;
   appointmentId?: string;
   prescriptionId?: string;
   description: string;
+  customerInfo: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+    address: string;
+    city: string;
+    country?: string;
+  };
   metadata?: Record<string, any>;
 }
 
 export interface ConfirmPaymentRequest {
-  paymentIntentId: string;
-  paymentMethodId?: string;
+  orderId: string;
+  paymentId: string;
+  payhereData?: any;
 }
 
 class PaymentService {
-  async createPaymentIntent(data: CreatePaymentIntentRequest): Promise<PaymentIntent> {
+  async createPayHerePayment(data: CreatePaymentRequest): Promise<PayHerePaymentData> {
     try {
-      const response = await api.post<{data: PaymentIntent}>(API_ENDPOINTS.PAYMENTS.INTENT, {
+      const response = await api.post<PayHerePaymentData>(API_ENDPOINTS.PAYMENTS.PAYHERE_CREATE, {
         ...data,
-        currency: data.currency || 'lkr',
+        currency: data.currency || 'LKR',
       });
       
       if (!response.success || !response.data) {
-        throw new Error(response.message || 'Failed to create payment intent');
+        throw new Error(response.message || 'Failed to create PayHere payment');
       }
       
       return response.data;
     } catch (error) {
-      console.error('Payment intent creation error:', error);
+      console.error('PayHere payment creation error:', error);
       throw error;
     }
   }
@@ -114,7 +131,7 @@ class PaymentService {
         throw new Error(response.message || 'Failed to confirm payment');
       }
       
-      return response;
+      return response.data;
     } catch (error) {
       console.error('Payment confirmation error:', error);
       throw error;

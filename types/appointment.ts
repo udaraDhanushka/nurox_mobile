@@ -73,7 +73,7 @@ export interface ApiAppointment {
   patientId: string;
   doctorId: string;
   type: string; // Backend enum format (e.g., "CONSULTATION")
-  status: string; // Backend enum format (e.g., "PENDING")
+  status: string; // Backend enum format (e.g., "CONFIRMED")
   title: string;
   description?: string;
   appointmentDate: string; // ISO string

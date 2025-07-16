@@ -17,9 +17,23 @@ const mapFrontendToBackendStatus = (frontendStatus: AppointmentStatus): string =
     case 'completed':
       return 'COMPLETED';
     case 'canceled':
-      return 'CANCELLED';
+      return 'CANCELED';
     default:
       return 'CONFIRMED';
+  }
+};
+
+// Reverse mapping: Backend status to frontend status
+const mapBackendToFrontendStatus = (backendStatus: string): AppointmentStatus => {
+  switch (backendStatus.toUpperCase()) {
+    case 'CONFIRMED':
+      return 'confirmed';
+    case 'COMPLETED':
+      return 'completed';
+    case 'CANCELED':
+      return 'canceled';
+    default:
+      return 'confirmed';
   }
 };
 
@@ -192,7 +206,7 @@ export const useAppointmentStore = create<AppointmentState>((set, get) => ({
     if (updates.status) {
       const backendStatus = mapFrontendToBackendStatus(updates.status);
       appointmentService.updateAppointment(id, {
-        status: backendStatus as any,
+        status: backendStatus,
         notes: updates.notes
       }).catch(error => {
         console.error('Failed to update appointment status in backend:', error);
@@ -211,7 +225,7 @@ export const useAppointmentStore = create<AppointmentState>((set, get) => ({
     
     // Update backend with proper status format
     appointmentService.updateAppointment(id, {
-      status: 'CANCELLED' as any
+      status: 'CANCELED'
     }).catch(error => {
       console.error('Failed to cancel appointment in backend:', error);
     });
@@ -298,23 +312,7 @@ export const useAppointmentStore = create<AppointmentState>((set, get) => ({
                   hour12: true 
                 }),
             duration: `${apiAppointment.duration || 30} min`,
-            status: (() => {
-              const backendStatus = apiAppointment.status.toUpperCase();
-              // Map backend status to frontend status
-              switch (backendStatus) {
-                case 'PENDING':
-                  // PENDING status means payment not completed yet, show as confirmed for UI
-                  return 'confirmed' as AppointmentStatus;
-                case 'CONFIRMED':
-                  return 'confirmed' as AppointmentStatus;
-                case 'COMPLETED':
-                  return 'completed' as AppointmentStatus;
-                case 'CANCELED':
-                  return 'canceled' as AppointmentStatus;
-                default:
-                  return 'confirmed' as AppointmentStatus;
-              }
-            })(),
+            status: mapBackendToFrontendStatus(apiAppointment.status),
             type: (() => {
               const transformed = apiAppointment.type.toLowerCase().replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
               // Handle special case for Follow-up (with hyphen)
@@ -365,22 +363,7 @@ export const useAppointmentStore = create<AppointmentState>((set, get) => ({
         if (appointment.id === id) {
           return {
             ...appointment,
-            status: (() => {
-              const backendStatus = apiAppointment.status.toUpperCase();
-              switch (backendStatus) {
-                case 'PENDING':
-                case 'CONFIRMED':
-                case 'IN_PROGRESS':
-                  return 'confirmed' as AppointmentStatus;
-                case 'COMPLETED':
-                  return 'completed' as AppointmentStatus;
-                case 'CANCELLED':
-                case 'NO_SHOW':
-                  return 'canceled' as AppointmentStatus;
-                default:
-                  return 'confirmed' as AppointmentStatus;
-              }
-            })(),
+            status: mapBackendToFrontendStatus(apiAppointment.status),
             notes: apiAppointment.notes || appointment.notes,
             // Update other fields as needed
           };

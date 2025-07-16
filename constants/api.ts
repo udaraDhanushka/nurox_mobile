@@ -147,11 +147,11 @@ export const API_ENDPOINTS = {
   // Payments
   PAYMENTS: {
     BASE: '/payments',
-    INTENT: '/payments/intent',
+    PAYHERE_CREATE: '/payments/payhere/create',
     CONFIRM: '/payments/confirm',
     BY_ID: (id: string) => `/payments/${id}`,
     REFUND: (id: string) => `/payments/${id}/refund`,
-    WEBHOOK: '/payments/webhook',
+    PAYHERE_WEBHOOK: '/payments/payhere-webhook',
     ANALYTICS: '/payments/analytics',
   },
   

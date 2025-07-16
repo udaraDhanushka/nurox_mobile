@@ -1,61 +1,29 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, TextInput, Alert, Image } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, CreditCard, Smartphone, Shield, Lock, Calendar, User, Building, Clock, CheckCircle, FileText } from 'lucide-react-native';
+import { ArrowLeft, Shield, Lock, Calendar, User, Building, CheckCircle, FileText } from 'lucide-react-native';
 import { COLORS, SIZES, SHADOWS } from '@/constants/theme';
 import { Button } from '@/components/Button';
-import { StripeProvider, useStripe } from '@stripe/stripe-react-native';
-import { STRIPE_CONFIG } from '@/config/stripe';
-import paymentService, { CreatePaymentIntentRequest, PaymentIntent } from '@/services/paymentService';
+import PayHereWebView, { PayHerePaymentData } from '@/components/PayHereWebView';
+import paymentService, { CreatePaymentRequest } from '@/services/paymentService';
 import { useAuthStore } from '@/store/authStore';
-import { formatCurrency, rupeesToCents } from '@/utils/currencyUtils';
+import { formatCurrency } from '@/utils/currencyUtils';
 
-interface PaymentMethod {
+// Insurance option interface - keeping only insurance as an optional feature
+interface InsuranceOption {
   id: string;
-  type: 'card' | 'digital' | 'insurance';
   name: string;
   icon: string;
   subtitle?: string;
 }
 
-const paymentMethods: PaymentMethod[] = [
-  {
-    id: 'card',
-    type: 'card',
-    name: 'Credit/Debit Card',
-    icon: '💳',
-    subtitle: 'Visa, Mastercard, Amex accepted'
-  },
-  // {
-  //   id: 'apple_pay',
-  //   type: 'digital',
-  //   name: 'Apple Pay',
-  //   icon: '🍎',
-  //   subtitle: 'Pay with Touch ID or Face ID'
-  // },
-  // {
-  //   id: 'google_pay',
-  //   type: 'digital',
-  //   name: 'Google Pay',
-  //   icon: '🎯',
-  //   subtitle: 'Quick and secure payment'
-  // },
-  // {
-  //   id: 'samsung_pay',
-  //   type: 'digital',
-  //   name: 'Samsung Pay',
-  //   icon: '📱',
-  //   subtitle: 'Samsung Wallet payment'
-  // },
-  {
-    id: 'insurance',
-    type: 'insurance',
-    name: 'Insurance Coverage',
-    icon: '🏥',
-    subtitle: 'Use your health insurance'
-  }
-];
+const insuranceOption: InsuranceOption = {
+  id: 'insurance',
+  name: 'Insurance Coverage',
+  icon: '🏥',
+  subtitle: 'Use your health insurance'
+};
 
 function PaymentScreenContent() {
   const router = useRouter();
@@ -122,38 +90,32 @@ function PaymentScreenContent() {
     return Math.round(baseFee * multiplier * 100) / 100; // Round to 2 decimal places
   }
 
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('');
-  const [cardNumber, setCardNumber] = useState('');
-  const [expiryDate, setExpiryDate] = useState('');
-  const [cvv, setCvv] = useState('');
-  const [cardHolderName, setCardHolderName] = useState('');
+  const [useInsurance, setUseInsurance] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
-  const { initPaymentSheet, presentPaymentSheet } = useStripe();
+  const [showPayHereWebView, setShowPayHereWebView] = useState(false);
+  const [payHereData, setPayHereData] = useState<PayHerePaymentData | null>(null);
 
-  const formatCardNumber = (text: string) => {
-    // Remove all non-digits
-    const digitsOnly = text.replace(/\D/g, '');
-    // Add spaces every 4 digits
-    const formatted = digitsOnly.replace(/(\d{4})(?=\d)/g, '$1 ');
-    return formatted.slice(0, 19); // Limit to 16 digits + 3 spaces
-  };
 
-  const formatExpiryDate = (text: string) => {
-    const digitsOnly = text.replace(/\D/g, '');
-    if (digitsOnly.length >= 2) {
-      return digitsOnly.slice(0, 2) + '/' + digitsOnly.slice(2, 4);
-    }
-    return digitsOnly;
-  };
-
-  const createPaymentIntent = async (): Promise<PaymentIntent | undefined> => {
+  const createPayHerePayment = async (): Promise<PayHerePaymentData | undefined> => {
     try {
-      const paymentData: CreatePaymentIntentRequest = {
-        amount: rupeesToCents(appointmentData.total), // Convert to cents
-        currency: 'lkr',
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      const paymentData: CreatePaymentRequest = {
+        amount: appointmentData.total,
+        currency: 'LKR',
         appointmentId: appointmentData.appointmentId,
         description: `Appointment with ${appointmentData.doctorName} - ${appointmentData.specialty}`,
+        customerInfo: {
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          phone: user.phone || '0771234567',
+          address: 'Colombo',
+          city: 'Colombo',
+          country: 'Sri Lanka'
+        },
         metadata: {
           doctorName: appointmentData.doctorName,
           specialty: appointmentData.specialty,
@@ -162,18 +124,18 @@ function PaymentScreenContent() {
           time: appointmentData.time,
           tokenNumber: appointmentData.tokenNumber.toString(),
           appointmentType: appointmentData.appointmentType,
-          // Add fee breakdown for billing history
-          consultationFee: appointmentData.consultationFee || (appointmentData.total * 0.8),
-          hospitalFee: appointmentData.hospitalFee || (appointmentData.total * 0.15),
-          tax: appointmentData.tax || (appointmentData.total * 0.05)
+          consultationFee: appointmentData.consultationFee,
+          hospitalFee: appointmentData.hospitalFee,
+          tax: appointmentData.tax
         }
       };
 
-      const paymentIntent = await paymentService.createPaymentIntent(paymentData);
-      setPaymentIntentId(paymentIntent.paymentIntentId);
-      return paymentIntent;
+      const payHerePayment = await paymentService.createPayHerePayment(paymentData);
+      console.log('PayHere payment data received:', JSON.stringify(payHerePayment, null, 2));
+      setPayHereData(payHerePayment);
+      return payHerePayment;
     } catch (error: any) {
-      console.error('Payment intent creation error:', error);
+      console.error('PayHere payment creation error:', error);
       
       // Handle authentication errors specifically
       if (error.message?.includes('Access token required') || error.message?.includes('Unauthorized')) {
@@ -194,130 +156,106 @@ function PaymentScreenContent() {
     }
   };
 
-  const initializePaymentSheet = async () => {
-    try {
-      const paymentIntent = await createPaymentIntent();
-      
-      // Check if payment intent was created successfully
-      if (!paymentIntent) {
-        throw new Error('Failed to create payment intent');
-      }
-      
-      console.log('Initializing payment sheet with return URL:', STRIPE_CONFIG.returnURL);
-      
-      const { error } = await initPaymentSheet({
-        merchantDisplayName: 'Nurox Healthcare',
-        paymentIntentClientSecret: paymentIntent.clientSecret,
-        defaultBillingDetails: {
-          name: cardHolderName || undefined,
-        },
-        appearance: {
-          colors: {
-            primary: COLORS.primary,
-          },
-        },
-        returnURL: STRIPE_CONFIG.returnURL,
-      });
-
-      if (error) {
-        console.error('Payment sheet initialization error:', error);
-        throw new Error(error.message);
-      }
-    } catch (error) {
-      console.error('Payment sheet setup error:', error);
-      throw error;
-    }
-  };
-
-  const handleStripePayment = async () => {
+  const handlePayHerePayment = async () => {
     try {
       setIsProcessing(true);
       
-      // Initialize payment sheet if not already done
-      await initializePaymentSheet();
+      // Create PayHere payment data
+      const payHerePayment = await createPayHerePayment();
       
-      // Present payment sheet
-      const { error } = await presentPaymentSheet();
-      
-      if (error) {
-        if (error.code === 'Canceled') {
-          Alert.alert('Payment Canceled', 'Payment was canceled by user.');
-        } else {
-          router.replace({
-            pathname: '/(patient)/payment-failure',
-            params: {
-              errorCode: error.code || 'PAYMENT_FAILED',
-              errorMessage: error.message || 'Payment could not be processed.',
-              amount: appointmentData.total.toString(),
-              doctorName: appointmentData.doctorName,
-              specialty: appointmentData.specialty,
-              date: appointmentData.date,
-              time: appointmentData.time,
-              appointmentId: appointmentData.appointmentId
-            }
-          });
-        }
-        return;
+      if (!payHerePayment) {
+        throw new Error('Failed to create PayHere payment');
       }
+      
+      // Show PayHere WebView
+      setShowPayHereWebView(true);
+    } catch (error) {
+      console.error('PayHere payment setup error:', error);
+      Alert.alert(
+        'Payment Error',
+        'Failed to initialize payment. Please try again.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
+  const handlePayHereSuccess = async (paymentId: string, orderId: string) => {
+    try {
+      setShowPayHereWebView(false);
+      
       // Confirm payment with backend
-      if (paymentIntentId) {
-        const confirmation = await paymentService.confirmPayment({
-          paymentIntentId: paymentIntentId
-        });
+      const confirmation = await paymentService.confirmPayment({
+        orderId,
+        paymentId,
+        payhereData: { paymentId, orderId }
+      });
 
-        if (confirmation.success) {
-          router.replace({
-            pathname: '/(patient)/payment-success',
-            params: {
-              transactionId: confirmation.payment.transactionId,
-              amount: appointmentData.total.toString(),
-              doctorName: appointmentData.doctorName,
-              specialty: appointmentData.specialty,
-              hospitalName: appointmentData.hospitalName,
-              date: appointmentData.date,
-              time: appointmentData.time,
-              tokenNumber: appointmentData.tokenNumber.toString(),
-              appointmentId: appointmentData.appointmentId,
-              paymentMethod: 'Credit Card'
-            }
-          });
-        } else {
-          router.replace({
-            pathname: '/(patient)/payment-failure',
-            params: {
-              errorCode: 'CONFIRMATION_FAILED',
-              errorMessage: 'Payment was processed but confirmation failed. Please contact support.',
-              amount: appointmentData.total.toString(),
-              doctorName: appointmentData.doctorName,
-              specialty: appointmentData.specialty,
-              date: appointmentData.date,
-              time: appointmentData.time,
-              appointmentId: appointmentData.appointmentId,
-              transactionId: confirmation.payment?.transactionId || ''
-            }
-          });
-        }
+      if (confirmation.success) {
+        router.replace({
+          pathname: '/(patient)/payment-success',
+          params: {
+            transactionId: paymentId,
+            amount: appointmentData.total.toString(),
+            doctorName: appointmentData.doctorName,
+            specialty: appointmentData.specialty,
+            hospitalName: appointmentData.hospitalName,
+            date: appointmentData.date,
+            time: appointmentData.time,
+            tokenNumber: appointmentData.tokenNumber.toString(),
+            appointmentId: appointmentData.appointmentId,
+            paymentMethod: 'PayHere'
+          }
+        });
+      } else {
+        throw new Error('Payment confirmation failed');
       }
     } catch (error) {
-      console.error('Payment processing error:', error);
+      console.error('PayHere payment confirmation error:', error);
       router.replace({
         pathname: '/(patient)/payment-failure',
         params: {
-          errorCode: 'NETWORK_ERROR',
-          errorMessage: 'An error occurred while processing your payment. Please try again.',
+          errorCode: 'CONFIRMATION_FAILED',
+          errorMessage: 'Payment was processed but confirmation failed. Please contact support.',
           amount: appointmentData.total.toString(),
           doctorName: appointmentData.doctorName,
           specialty: appointmentData.specialty,
           date: appointmentData.date,
           time: appointmentData.time,
-          appointmentId: appointmentData.appointmentId
+          appointmentId: appointmentData.appointmentId,
+          transactionId: paymentId
         }
       });
-    } finally {
-      setIsProcessing(false);
     }
   };
+
+  const handlePayHereError = (error: string) => {
+    setShowPayHereWebView(false);
+    router.replace({
+      pathname: '/(patient)/payment-failure',
+      params: {
+        errorCode: 'PAYMENT_FAILED',
+        errorMessage: error,
+        amount: appointmentData.total.toString(),
+        doctorName: appointmentData.doctorName,
+        specialty: appointmentData.specialty,
+        date: appointmentData.date,
+        time: appointmentData.time,
+        appointmentId: appointmentData.appointmentId
+      }
+    });
+  };
+
+  const handlePayHereCancel = () => {
+    setShowPayHereWebView(false);
+    Alert.alert('Payment Canceled', 'Payment was canceled by user.');
+  };
+
+  const handlePayHereClose = () => {
+    setShowPayHereWebView(false);
+  };
+
 
   const handleInsurancePayment = async () => {
     setIsProcessing(true);
@@ -359,15 +297,12 @@ function PaymentScreenContent() {
       return;
     }
 
-    if (!selectedPaymentMethod) {
-      Alert.alert('Payment Method Required', 'Please select a payment method');
-      return;
-    }
-
-    if (selectedPaymentMethod === 'card') {
-      await handleStripePayment();
-    } else if (selectedPaymentMethod === 'insurance') {
+    // If insurance is selected, handle insurance payment
+    if (useInsurance) {
       await handleInsurancePayment();
+    } else {
+      // Default to PayHere payment
+      await handlePayHerePayment();
     }
   };
 
@@ -455,93 +390,39 @@ function PaymentScreenContent() {
     </View>
   );
 
-  const renderPaymentMethods = () => (
-    <View style={styles.paymentMethodsCard}>
-      <Text style={styles.cardTitle}>Payment Method</Text>
+  const renderInsuranceOption = () => (
+    <View style={styles.insuranceCard}>
+      <Text style={styles.cardTitle}>Payment Options</Text>
       
-      {paymentMethods.map((method) => (
-        <TouchableOpacity
-          key={method.id}
-          style={[
-            styles.paymentMethodItem,
-            selectedPaymentMethod === method.id && styles.selectedPaymentMethod
-          ]}
-          onPress={() => setSelectedPaymentMethod(method.id)}
-        >
-          <Text style={styles.paymentMethodIcon}>{method.icon}</Text>
-          <View style={styles.paymentMethodInfo}>
-            <Text style={styles.paymentMethodName}>{method.name}</Text>
-            {method.subtitle && (
-              <Text style={styles.paymentMethodSubtitle}>{method.subtitle}</Text>
-            )}
-          </View>
-          {selectedPaymentMethod === method.id && (
-            <CheckCircle size={20} color={COLORS.primary} />
+      <TouchableOpacity
+        style={[
+          styles.insuranceItem,
+          useInsurance && styles.selectedInsuranceItem
+        ]}
+        onPress={() => setUseInsurance(!useInsurance)}
+      >
+        <Text style={styles.insuranceIcon}>{insuranceOption.icon}</Text>
+        <View style={styles.insuranceInfo}>
+          <Text style={styles.insuranceName}>{insuranceOption.name}</Text>
+          {insuranceOption.subtitle && (
+            <Text style={styles.insuranceSubtitle}>{insuranceOption.subtitle}</Text>
           )}
-        </TouchableOpacity>
-      ))}
+        </View>
+        {useInsurance && (
+          <CheckCircle size={20} color={COLORS.primary} />
+        )}
+      </TouchableOpacity>
+      
+      {!useInsurance && (
+        <View style={styles.paymentMethodInfo}>
+          <Text style={styles.paymentMethodNote}>
+            💳 Payment will be processed through PayHere secure gateway
+          </Text>
+        </View>
+      )}
     </View>
   );
 
-  const renderCardForm = () => {
-    if (selectedPaymentMethod !== 'card') return null;
-
-    return (
-      <View style={styles.cardFormContainer}>
-        <Text style={styles.cardTitle}>Card Details</Text>
-        
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Card Number</Text>
-          <TextInput
-            style={styles.textInput}
-            value={cardNumber}
-            onChangeText={(text) => setCardNumber(formatCardNumber(text))}
-            placeholder="1234 5678 9012 3456"
-            keyboardType="numeric"
-            maxLength={19}
-          />
-        </View>
-
-        <View style={styles.rowInputs}>
-          <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
-            <Text style={styles.inputLabel}>Expiry Date</Text>
-            <TextInput
-              style={styles.textInput}
-              value={expiryDate}
-              onChangeText={(text) => setExpiryDate(formatExpiryDate(text))}
-              placeholder="MM/YY"
-              keyboardType="numeric"
-              maxLength={5}
-            />
-          </View>
-          
-          <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
-            <Text style={styles.inputLabel}>CVV</Text>
-            <TextInput
-              style={styles.textInput}
-              value={cvv}
-              onChangeText={setCvv}
-              placeholder="123"
-              keyboardType="numeric"
-              maxLength={4}
-              secureTextEntry
-            />
-          </View>
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Cardholder Name</Text>
-          <TextInput
-            style={styles.textInput}
-            value={cardHolderName}
-            onChangeText={setCardHolderName}
-            placeholder="John Doe"
-            autoCapitalize="words"
-          />
-        </View>
-      </View>
-    );
-  };
 
   const renderSecurityFeatures = () => (
     <View style={styles.securityCard}>
@@ -594,34 +475,38 @@ function PaymentScreenContent() {
         
         {renderAppointmentSummary()}
         {renderPricingBreakdown()}
-        {renderPaymentMethods()}
-        {renderCardForm()}
+        {renderInsuranceOption()}
         {renderSecurityFeatures()}
       </ScrollView>
 
       <View style={styles.footer}>
         <Button
-          title={isProcessing ? "Processing..." : `Pay $${appointmentData.total.toFixed(2)}`}
+          title={isProcessing ? "Processing..." : `Pay ${formatCurrency(appointmentData.total)}`}
           onPress={handlePayment}
           style={styles.payButton}
           isLoading={isProcessing}
           disabled={isProcessing}
         />
       </View>
+
+      {/* PayHere WebView Modal */}
+      {showPayHereWebView && payHereData && (
+        <View style={StyleSheet.absoluteFill}>
+          <PayHereWebView
+            paymentData={payHereData}
+            onSuccess={handlePayHereSuccess}
+            onError={handlePayHereError}
+            onCancel={handlePayHereCancel}
+            onClose={handlePayHereClose}
+          />
+        </View>
+      )}
     </SafeAreaView>
   );
 }
 
 export default function PaymentScreen() {
-  return (
-    <StripeProvider
-      publishableKey={STRIPE_CONFIG.publishableKey}
-      merchantIdentifier={STRIPE_CONFIG.merchantIdentifier}
-      urlScheme={STRIPE_CONFIG.urlScheme}
-    >
-      <PaymentScreenContent />
-    </StripeProvider>
-  );
+  return <PaymentScreenContent />;
 }
 
 const styles = StyleSheet.create({
@@ -734,14 +619,14 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: COLORS.primary,
   },
-  paymentMethodsCard: {
+  insuranceCard: {
     backgroundColor: COLORS.white,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
     ...SHADOWS.small,
   },
-  paymentMethodItem: {
+  insuranceItem: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
@@ -750,55 +635,37 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     marginBottom: 8,
   },
-  selectedPaymentMethod: {
+  selectedInsuranceItem: {
     borderColor: COLORS.primary,
     backgroundColor: COLORS.transparentPrimary,
   },
-  paymentMethodIcon: {
+  insuranceIcon: {
     fontSize: 24,
     marginRight: 12,
   },
-  paymentMethodInfo: {
+  insuranceInfo: {
     flex: 1,
   },
-  paymentMethodName: {
+  insuranceName: {
     fontSize: SIZES.md,
     fontWeight: '500',
     color: COLORS.textPrimary,
     marginBottom: 2,
   },
-  paymentMethodSubtitle: {
+  insuranceSubtitle: {
     fontSize: SIZES.sm,
     color: COLORS.textSecondary,
   },
-  cardFormContainer: {
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    ...SHADOWS.small,
-  },
-  inputGroup: {
-    marginBottom: 16,
-  },
-  inputLabel: {
-    fontSize: SIZES.sm,
-    fontWeight: '500',
-    color: COLORS.textPrimary,
-    marginBottom: 8,
-  },
-  textInput: {
-    backgroundColor: COLORS.white,
-    borderRadius: 8,
+  paymentMethodInfo: {
+    marginTop: 8,
     padding: 12,
-    fontSize: SIZES.md,
-    color: COLORS.textPrimary,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    backgroundColor: COLORS.lightGray,
+    borderRadius: 8,
   },
-  rowInputs: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
+  paymentMethodNote: {
+    fontSize: SIZES.sm,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
   },
   securityCard: {
     backgroundColor: COLORS.white,
