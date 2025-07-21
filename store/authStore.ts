@@ -3,116 +3,11 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthState, LoginCredentials, RegisterData, ResetPasswordData, NewPasswordData, User, UserRole } from '../types/auth';
 import { Language } from './languageStore';
-
-// Mock API functions (replace with actual API calls)
-const mockLogin = async (credentials: LoginCredentials): Promise<{ user: User; token: string }> => {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  
-  // Mock users for different roles with role-specific data
-  const users: Record<string, User> = {
-    'patient@example.com': {
-      id: 'p1',
-      email: 'patient@example.com',
-      firstName: 'John',
-      lastName: 'Doe',
-      role: 'patient' as UserRole,
-      profileImage: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?q=80&w=987&auto=format&fit=crop',
-      language: 'en'
-    },
-    'doctor@example.com': {
-      id: 'd1',
-      email: 'doctor@example.com',
-      firstName: 'Sarah',
-      lastName: 'Johnson',
-      role: 'doctor' as UserRole,
-      profileImage: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?q=80&w=2070&auto=format&fit=crop',
-      specialization: 'Internal Medicine',
-      licenseNumber: 'MD123456',
-      hospitalAffiliation: 'City General Hospital',
-      language: 'en'
-    },
-    'pharmacist@example.com': {
-      id: 'ph1',
-      email: 'pharmacist@example.com',
-      firstName: 'Michael',
-      lastName: 'Chen',
-      role: 'pharmacist' as UserRole,
-      profileImage: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?q=80&w=1964&auto=format&fit=crop',
-      licenseNumber: 'PH789012',
-      pharmacyAffiliation: 'HealthCare Pharmacy',
-      language: 'en'
-    }
-  };
-  
-  const user = users[credentials.email];
-  
-  if (!user || credentials.password !== 'password123') {
-    throw new Error('Invalid email or password');
-  }
-  
-  return {
-    user,
-    token: 'mock-jwt-token-' + user.role
-  };
-};
-
-const mockRegister = async (data: RegisterData): Promise<{ user: User; token: string }> => {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 1500));
-  
-  // In a real app, this would create a new user in the database
-  const user: User = {
-    id: 'new-' + Math.random().toString(36).substring(2, 9),
-    email: data.email,
-    firstName: data.firstName,
-    lastName: data.lastName,
-    role: data.role,
-    profileImage: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=1780&auto=format&fit=crop',
-    language: 'en'
-  };
-  
-  // Add role-specific default data
-  if (data.role === 'doctor') {
-    user.specialization = 'General Practice';
-    user.hospitalAffiliation = 'General Hospital';
-  } else if (data.role === 'pharmacist') {
-    user.pharmacyAffiliation = 'Community Pharmacy';
-  }
-  
-  return {
-    user,
-    token: 'mock-jwt-token-' + user.role
-  };
-};
-
-const mockResetPassword = async (data: ResetPasswordData): Promise<void> => {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  
-  // In a real app, this would send a reset email
-  if (data.email.includes('@')) {
-    return;
-  }
-  
-  throw new Error('Invalid email address');
-};
-
-const mockSetNewPassword = async (data: NewPasswordData): Promise<void> => {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  
-  // In a real app, this would update the password in the database
-  if (data.password !== data.confirmPassword) {
-    throw new Error('Passwords do not match');
-  }
-  
-  if (data.password.length < 8) {
-    throw new Error('Password must be at least 8 characters');
-  }
-  
-  return;
-};
+import { authService } from '../services/authService';
+import { calculateAge } from '../utils/dateUtils';
+import { dataSyncService } from '../services/dataSyncService';
+import { patientDataService } from '../services/patientDataService';
+import { patientSyncBroadcast } from '../services/patientSyncBroadcast';
 
 interface AuthStore extends AuthState {
   login: (credentials: LoginCredentials) => Promise<void>;
@@ -120,7 +15,7 @@ interface AuthStore extends AuthState {
   logout: () => Promise<void>;
   resetPassword: (data: ResetPasswordData) => Promise<void>;
   setNewPassword: (data: NewPasswordData) => Promise<void>;
-  updateUser: (user: User) => void;
+  updateUser: (user: Partial<User>) => Promise<void>;
   updateLanguage: (language: Language) => void;
   clearError: () => void;
   // Role-based helpers
@@ -130,6 +25,10 @@ interface AuthStore extends AuthState {
   getUserDisplayName: () => string;
   getUserRole: () => UserRole | null;
   getUserLanguage: () => Language | undefined;
+  // Auth status helpers
+  isAuthenticated: () => boolean;
+  forceLogout: () => Promise<void>;
+  checkTokenExpiration: () => boolean;
 }
 
 export const useAuthStore = create<AuthStore>()(
@@ -137,18 +36,70 @@ export const useAuthStore = create<AuthStore>()(
     (set, get) => ({
       user: null,
       token: null,
+      refreshToken: null,
       isLoading: false,
       error: null,
       
       login: async (credentials) => {
         set({ isLoading: true, error: null });
         try {
-          const { user, token } = await mockLogin(credentials);
-          set({ user, token, isLoading: false });
+          console.log('Auth Store: Starting login process...');
+          const authResponse = await authService.login(credentials);
+          console.log('Auth Store: Login response received:', {
+            user: authResponse.user ? { id: authResponse.user.id, role: authResponse.user.role } : null,
+            hasToken: !!authResponse.accessToken
+          });
+          
+          // Calculate age if dateOfBirth is available
+          const userWithAge = authResponse.user.dateOfBirth 
+            ? { ...authResponse.user, age: calculateAge(authResponse.user.dateOfBirth) }
+            : authResponse.user;
+          
+          set({ 
+            user: userWithAge, 
+            token: authResponse.accessToken, 
+            refreshToken: authResponse.refreshToken,
+            isLoading: false 
+          });
+          
+          // Cache patient data for cross-app access
+          if (userWithAge.role === 'patient' || userWithAge.role === 'PATIENT') {
+            patientDataService.cachePatientData(userWithAge);
+          }
+          
+          console.log('Auth Store: State updated successfully');
         } catch (error) {
+          console.error('Auth Store: Login error:', error);
+          
+          // Provide user-friendly error messages for common network issues
+          let errorMessage = 'An unknown error occurred';
+          if (error instanceof Error) {
+            if (error.message.includes('Network request failed') || error.message.includes('Unable to connect')) {
+              errorMessage = 'Unable to connect to server. Please check your internet connection and try again.';
+            } else if (error.message.includes('Database connection unavailable') || error.message.includes('Database service unavailable')) {
+              errorMessage = 'Database service is currently unavailable. Please try again in a few minutes.';
+            } else if (error.message.includes('timeout')) {
+              errorMessage = 'Connection timeout. Please try again.';
+            } else if (error.message.includes('401')) {
+              errorMessage = 'Invalid email or password. Please try again.';
+            } else if (error.message.includes('403')) {
+              errorMessage = 'Account access is restricted. Please contact support.';
+            } else if (error.message.includes('404')) {
+              errorMessage = 'Service not found. Please try again later.';
+            } else if (error.message.includes('500')) {
+              errorMessage = 'Server error. Please try again later.';
+            } else if (error.message.includes('503')) {
+              errorMessage = 'Service temporarily unavailable. Please try again in a few minutes.';
+            } else if (error.message.includes('408')) {
+              errorMessage = 'Request timeout. Please check your connection and try again.';
+            } else {
+              errorMessage = error.message;
+            }
+          }
+          
           set({ 
             isLoading: false, 
-            error: error instanceof Error ? error.message : 'An unknown error occurred' 
+            error: errorMessage
           });
         }
       },
@@ -156,8 +107,25 @@ export const useAuthStore = create<AuthStore>()(
       register: async (data) => {
         set({ isLoading: true, error: null });
         try {
-          const { user, token } = await mockRegister(data);
-          set({ user, token, isLoading: false });
+          const authResponse = await authService.register(data);
+          
+          // Calculate age if dateOfBirth is available
+          const userWithAge = authResponse.user.dateOfBirth 
+            ? { ...authResponse.user, age: calculateAge(authResponse.user.dateOfBirth) }
+            : authResponse.user;
+          
+          set({ 
+            user: userWithAge, 
+            token: authResponse.accessToken, 
+            refreshToken: authResponse.refreshToken,
+            isLoading: false 
+          });
+          
+          // Cache patient data for cross-app access
+          if (userWithAge.role === 'patient' || userWithAge.role === 'PATIENT') {
+            patientDataService.cachePatientData(userWithAge);
+          }
+          
           return Promise.resolve();
         } catch (error) {
           set({ 
@@ -170,8 +138,11 @@ export const useAuthStore = create<AuthStore>()(
       
       logout: async () => {
         try {
+          // Call backend logout
+          await authService.logout();
+          
           // Clear all auth data
-          set({ user: null, token: null, error: null, isLoading: false });
+          set({ user: null, token: null, refreshToken: null, error: null, isLoading: false });
           
           // Clear the persisted storage completely
           await AsyncStorage.removeItem('auth-storage');
@@ -181,14 +152,14 @@ export const useAuthStore = create<AuthStore>()(
         } catch (error) {
           console.error('Logout error:', error);
           // Even if there's an error clearing storage, clear the state
-          set({ user: null, token: null, error: null, isLoading: false });
+          set({ user: null, token: null, refreshToken: null, error: null, isLoading: false });
         }
       },
       
       resetPassword: async (data) => {
         set({ isLoading: true, error: null });
         try {
-          await mockResetPassword(data);
+          await authService.forgotPassword(data.email);
           set({ isLoading: false });
         } catch (error) {
           set({ 
@@ -201,7 +172,10 @@ export const useAuthStore = create<AuthStore>()(
       setNewPassword: async (data) => {
         set({ isLoading: true, error: null });
         try {
-          await mockSetNewPassword(data);
+          if (data.password !== data.confirmPassword) {
+            throw new Error('Passwords do not match');
+          }
+          await authService.resetPassword(data.token, data.password);
           set({ isLoading: false });
         } catch (error) {
           set({ 
@@ -211,14 +185,38 @@ export const useAuthStore = create<AuthStore>()(
         }
       },
 
-      updateUser: (updatedUser) => {
-        set({ user: updatedUser });
+      updateUser: async (updatedUser) => {
+        try {
+          const updated = await authService.updateProfile(updatedUser);
+          
+          // Calculate age if dateOfBirth is available
+          const userWithAge = updated.dateOfBirth 
+            ? { ...updated, age: calculateAge(updated.dateOfBirth) }
+            : updated;
+          
+          set({ user: userWithAge });
+
+          // Cache patient data for cross-app access and broadcast update
+          if (userWithAge.role === 'patient' || userWithAge.role === 'PATIENT') {
+            patientDataService.cachePatientData(userWithAge);
+            await dataSyncService.onPatientProfileUpdated(userWithAge.id, updatedUser, userWithAge);
+            await patientSyncBroadcast.broadcastPatientUpdate(userWithAge.id, userWithAge);
+          }
+        } catch (error) {
+          console.error('Update user error:', error);
+          throw error;
+        }
       },
       
-      updateLanguage: (language) => {
-        const { user } = get();
-        if (user) {
-          set({ user: { ...user, language } });
+      updateLanguage: async (language) => {
+        try {
+          await authService.updateLanguage(language);
+          const { user } = get();
+          if (user) {
+            set({ user: { ...user, language } });
+          }
+        } catch (error) {
+          console.error('Update language error:', error);
         }
       },
       
@@ -229,24 +227,24 @@ export const useAuthStore = create<AuthStore>()(
       // Role-based helpers
       isPatient: () => {
         const { user } = get();
-        return user?.role === 'patient';
+        return user?.role?.toLowerCase() === 'patient';
       },
 
       isDoctor: () => {
         const { user } = get();
-        return user?.role === 'doctor';
+        return user?.role?.toLowerCase() === 'doctor';
       },
 
       isPharmacist: () => {
         const { user } = get();
-        return user?.role === 'pharmacist';
+        return user?.role?.toLowerCase() === 'pharmacist';
       },
 
       getUserDisplayName: () => {
         const { user } = get();
         if (!user) return '';
         
-        if (user.role === 'doctor') {
+        if (user.role?.toLowerCase() === 'doctor') {
           return `Dr. ${user.firstName} ${user.lastName}`;
         }
         return `${user.firstName} ${user.lastName}`;
@@ -260,12 +258,83 @@ export const useAuthStore = create<AuthStore>()(
       getUserLanguage: () => {
         const { user } = get();
         return user?.language;
+      },
+
+      // Check if user is properly authenticated (matches app layout logic)
+      isAuthenticated: () => {
+        const { user, token } = get();
+        return !!(user && token);
+      },
+
+      // Force logout and clear all data (useful for debugging)
+      forceLogout: async () => {
+        try {
+          console.log('Force logout initiated');
+          
+          // Clear all auth data
+          set({ user: null, token: null, refreshToken: null, error: null, isLoading: false });
+          
+          // Clear the persisted storage completely
+          await AsyncStorage.removeItem('auth-storage');
+          
+          console.log('Force logout completed');
+        } catch (error) {
+          console.error('Force logout error:', error);
+        }
+      },
+
+      // Check if tokens are expired and clear them if so
+      checkTokenExpiration: () => {
+        const { token, refreshToken } = get();
+        
+        if (!token && !refreshToken) {
+          return false;
+        }
+
+        const isTokenExpired = (tokenString: string): boolean => {
+          try {
+            console.log('AuthStore: Checking token expiration using atob method');
+            
+            // Explicitly check if atob is available
+            if (typeof atob === 'undefined') {
+              console.error('AuthStore: atob is not available in this environment');
+              return true;
+            }
+            
+            const payload = JSON.parse(atob(tokenString.split('.')[1]));
+            const now = Math.floor(Date.now() / 1000);
+            const expired = payload.exp < now;
+            
+            console.log('AuthStore: Token validation result:', {
+              exp: payload.exp,
+              now: now,
+              expired: expired
+            });
+            
+            return expired;
+          } catch (error) {
+            console.error('AuthStore: Error checking token expiration:', error);
+            return true;
+          }
+        };
+
+        const accessExpired = token ? isTokenExpired(token) : true;
+        const refreshExpired = refreshToken ? isTokenExpired(refreshToken) : true;
+
+        if (accessExpired && refreshExpired) {
+          console.log('Both tokens are expired, clearing auth data');
+          set({ user: null, token: null, refreshToken: null, error: null, isLoading: false });
+          AsyncStorage.removeItem('auth-storage');
+          return true;
+        }
+
+        return false;
       }
     }),
     {
       name: 'auth-storage',
       storage: createJSONStorage(() => AsyncStorage),
-      partialize: (state) => ({ user: state.user, token: state.token }),
+      partialize: (state) => ({ user: state.user, token: state.token, refreshToken: state.refreshToken }),
     }
   )
 );

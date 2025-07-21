@@ -1,66 +1,22 @@
-import React from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Image } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FileText, Package, AlertCircle, CheckCircle, User } from 'lucide-react-native';
 import { COLORS, SIZES, SHADOWS } from '@/constants/theme';
 import { useAuthStore } from '@/store/authStore';
-
-// Mock data for pharmacist dashboard
-const pendingPrescriptions = [
-    {
-        id: '1',
-        patientName: 'John Doe',
-        medication: 'Lisinopril 10mg',
-        doctor: 'Dr. Sarah Johnson',
-        date: '2023-11-15',
-        status: 'pending',
-        patientImage: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?q=80&w=987&auto=format&fit=crop'
-    },
-    {
-        id: '2',
-        patientName: 'Emily Johnson',
-        medication: 'Amoxicillin 500mg',
-        doctor: 'Dr. Michael Chen',
-        date: '2023-11-15',
-        status: 'pending',
-        patientImage: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?q=80&w=1961&auto=format&fit=crop'
-    }
-];
-
-const lowStockItems = [
-    {
-        id: '1',
-        name: 'Lisinopril 10mg',
-        currentStock: 15,
-        minStock: 20,
-        supplier: 'MediPharm Supplies'
-    },
-    {
-        id: '2',
-        name: 'Metformin 500mg',
-        currentStock: 8,
-        minStock: 25,
-        supplier: 'HealthCare Distributors'
-    },
-    {
-        id: '3',
-        name: 'Atorvastatin 20mg',
-        currentStock: 12,
-        minStock: 20,
-        supplier: 'MediPharm Supplies'
-    }
-];
-
-const stats = [
-    { title: 'Pending', value: 12, icon: <AlertCircle size={24} color={COLORS.warning} /> },
-    { title: 'Completed', value: 28, icon: <CheckCircle size={24} color={COLORS.success} /> },
-    { title: 'Low Stock', value: 8, icon: <Package size={24} color={COLORS.error} /> }
-];
+import { prescriptionService } from '../../../services/prescriptionService';
 
 export default function PharmacistDashboardScreen() {
     const router = useRouter();
     const { user } = useAuthStore();
+    const [pendingPrescriptions, setPendingPrescriptions] = useState([]);
+    const [stats, setStats] = useState([
+        { title: 'Pending', value: 0, icon: <AlertCircle size={24} color={COLORS.warning} /> },
+        { title: 'Completed', value: 0, icon: <CheckCircle size={24} color={COLORS.success} /> },
+        { title: 'Low Stock', value: 0, icon: <Package size={24} color={COLORS.error} /> }
+    ]);
+    const [isLoading, setIsLoading] = useState(true);
 
     const currentDate = new Date().toLocaleDateString('en-US', {
         weekday: 'long',
@@ -68,6 +24,50 @@ export default function PharmacistDashboardScreen() {
         month: 'long',
         day: 'numeric'
     });
+
+    useEffect(() => {
+        loadDashboardData();
+    }, [user?.id]);
+
+    const loadDashboardData = async () => {
+        if (!user?.id) return;
+        
+        try {
+            setIsLoading(true);
+            
+            // Load pending prescriptions
+            const pendingResponse = await prescriptionService.getPrescriptions({
+                status: 'PENDING',
+                limit: 5
+            });
+            setPendingPrescriptions(pendingResponse.prescriptions);
+
+            // Get prescription analytics
+            const analyticsResponse = await prescriptionService.getPrescriptionAnalytics();
+            
+            setStats([
+                { 
+                    title: 'Pending', 
+                    value: analyticsResponse.statusBreakdown?.pending || 0, 
+                    icon: <AlertCircle size={24} color={COLORS.warning} /> 
+                },
+                { 
+                    title: 'Completed', 
+                    value: (analyticsResponse.statusBreakdown?.dispensed || 0) + (analyticsResponse.statusBreakdown?.ready || 0), 
+                    icon: <CheckCircle size={24} color={COLORS.success} /> 
+                },
+                { 
+                    title: 'Low Stock', 
+                    value: 0, // This would come from inventory API 
+                    icon: <Package size={24} color={COLORS.error} /> 
+                }
+            ]);
+        } catch (error) {
+            console.error('Failed to load dashboard data:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     return (
         <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -116,76 +116,66 @@ export default function PharmacistDashboardScreen() {
                         </TouchableOpacity>
                     </View>
 
-                    {pendingPrescriptions.map((prescription) => (
-                        <TouchableOpacity
-                            key={prescription.id}
-                            style={styles.prescriptionCard}
-                            onPress={() => router.push(`/prescriptions/${prescription.id}`)}
-                        >
-                            <Image
-                                source={{ uri: prescription.patientImage }}
-                                style={styles.patientImage}
-                            />
-                            <View style={styles.prescriptionInfo}>
-                                <Text style={styles.patientName}>{prescription.patientName}</Text>
-                                <Text style={styles.medicationName}>{prescription.medication}</Text>
-                                <Text style={styles.prescriptionDetails}>
-                                    {prescription.doctor} • {prescription.date}
-                                </Text>
-                            </View>
-                            <View style={[
-                                styles.statusBadge,
-                                prescription.status === 'pending' ? styles.pendingBadge : styles.completedBadge
-                            ]}>
-                                <Text style={styles.statusText}>{prescription.status}</Text>
-                            </View>
-                        </TouchableOpacity>
-                    ))}
+                    {isLoading ? (
+                        <View style={styles.loadingContainer}>
+                            <ActivityIndicator size="small" color={COLORS.primary} />
+                            <Text style={styles.loadingText}>Loading...</Text>
+                        </View>
+                    ) : pendingPrescriptions.length === 0 ? (
+                        <View style={styles.emptyContainer}>
+                            <Text style={styles.emptyText}>No pending prescriptions</Text>
+                        </View>
+                    ) : (
+                        pendingPrescriptions.map((prescription) => (
+                            <TouchableOpacity
+                                key={prescription.id}
+                                style={styles.prescriptionCard}
+                                onPress={() => router.push(`/prescriptions/${prescription.id}`)}
+                            >
+                                <Image
+                                    source={{ 
+                                        uri: prescription.patient?.profileImage || 
+                                        'https://images.unsplash.com/photo-1599566150163-29194dcaad36?q=80&w=987&auto=format&fit=crop'
+                                    }}
+                                    style={styles.patientImage}
+                                />
+                                <View style={styles.prescriptionInfo}>
+                                    <Text style={styles.patientName}>
+                                        {prescription.patient ? 
+                                            `${prescription.patient.firstName} ${prescription.patient.lastName}` : 
+                                            'Unknown Patient'
+                                        }
+                                    </Text>
+                                    <Text style={styles.medicationName}>
+                                        {prescription.items?.[0]?.medicine?.name || 'Unknown medication'}
+                                    </Text>
+                                    <Text style={styles.prescriptionDetails}>
+                                        {prescription.doctor ? 
+                                            `Dr. ${prescription.doctor.firstName} ${prescription.doctor.lastName}` : 
+                                            'Unknown Doctor'
+                                        } • {new Date(prescription.createdAt).toLocaleDateString()}
+                                    </Text>
+                                </View>
+                                <View style={[
+                                    styles.statusBadge,
+                                    prescription.status === 'PENDING' ? styles.pendingBadge : styles.completedBadge
+                                ]}>
+                                    <Text style={styles.statusText}>{prescription.status || 'pending'}</Text>
+                                </View>
+                            </TouchableOpacity>
+                        ))
+                    )}
                 </View>
 
-                {/* Low Stock Items */}
+                {/* Inventory Quick Access */}
                 <View style={[styles.sectionContainer, { marginBottom: 20 }]}>
-                    <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>Low Stock Items</Text>
-                        <TouchableOpacity onPress={() => router.push('/inventory')}>
-                            <Text style={styles.seeAllText}>See All</Text>
-                        </TouchableOpacity>
-                    </View>
-
-                    {lowStockItems.map((item) => (
-                        <TouchableOpacity
-                            key={item.id}
-                            style={styles.inventoryCard}
-                            onPress={() => router.push(`/inventory/${item.id}`)}
-                        >
-                            <View style={styles.inventoryIconContainer}>
-                                <Package size={24} color={COLORS.error} />
-                            </View>
-                            <View style={styles.inventoryInfo}>
-                                <Text style={styles.inventoryName}>{item.name}</Text>
-                                <Text style={styles.inventorySupplier}>{item.supplier}</Text>
-                                <View style={styles.stockContainer}>
-                                    <Text style={styles.stockText}>
-                                        Stock: <Text style={styles.stockValue}>{item.currentStock}</Text> / {item.minStock}
-                                    </Text>
-                                    <View style={styles.stockBar}>
-                                        <View
-                                            style={[
-                                                styles.stockLevel,
-                                                { width: `${(item.currentStock / item.minStock) * 100}%` }
-                                            ]}
-                                        />
-                                    </View>
-                                </View>
-                            </View>
-                            <TouchableOpacity
-                                style={styles.reorderButton}
-                                onPress={() => router.push(`/inventory/reorder/${item.id}`)}
-                            >
-                                <Text style={styles.reorderText}>Reorder</Text>
-                            </TouchableOpacity>
-                        </TouchableOpacity>
-                    ))}
+                    <TouchableOpacity 
+                        style={styles.inventoryQuickAccess}
+                        onPress={() => router.push('/inventory')}
+                    >
+                        <Package size={24} color={COLORS.primary} />
+                        <Text style={styles.inventoryQuickAccessText}>Manage Inventory</Text>
+                    </TouchableOpacity>
                 </View>
             </ScrollView>
         </SafeAreaView>
@@ -401,5 +391,36 @@ const styles = StyleSheet.create({
         fontSize: SIZES.xs,
         color: COLORS.white,
         fontWeight: '600',
+    },
+    loadingContainer: {
+        alignItems: 'center',
+        paddingVertical: 20,
+    },
+    loadingText: {
+        fontSize: SIZES.sm,
+        color: COLORS.textSecondary,
+        marginTop: 8,
+    },
+    emptyContainer: {
+        alignItems: 'center',
+        paddingVertical: 20,
+    },
+    emptyText: {
+        fontSize: SIZES.md,
+        color: COLORS.textSecondary,
+    },
+    inventoryQuickAccess: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: COLORS.white,
+        borderRadius: 12,
+        padding: 16,
+        gap: 12,
+        ...SHADOWS.small,
+    },
+    inventoryQuickAccessText: {
+        fontSize: SIZES.md,
+        fontWeight: '600',
+        color: COLORS.primary,
     },
 });

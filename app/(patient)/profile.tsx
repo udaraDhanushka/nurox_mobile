@@ -9,6 +9,7 @@ import * as ImagePicker from 'expo-image-picker';
 import Constants from 'expo-constants';
 import { LanguageSelector } from '@/components/ui/LanguageSelector';
 import { useTranslation } from '@/hooks/useTranslation';
+import { formatAge } from '@/utils/dateUtils';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -134,6 +135,7 @@ export default function ProfileScreen() {
     <SafeAreaView style={[styles.container, isDarkMode && styles.containerDark]}>
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* 1. Profile Image Section */}
+<<<<<<< Updated upstream
         <View style={styles.profileHeader}>
           <View style={styles.avatarContainer}>
             <TouchableOpacity
@@ -158,6 +160,49 @@ export default function ProfileScreen() {
               ) : (
                 <View style={[styles.avatarPlaceholder, isDarkMode && styles.avatarPlaceholderDark]}>
                   <User size={40} color={isDarkMode ? COLORS.white : COLORS.primary} />
+=======
+                <View style={styles.profileHeader}>
+                    <View style={styles.avatarContainer}>
+                        <TouchableOpacity
+                            style={styles.avatarWrapper}
+                            onPress={() => {
+                                Alert.alert(
+                                    'Update Profile Picture',
+                                    'Choose a method to update your profile picture',
+                                    [
+                                        { text: 'Take Photo', onPress: handleTakePhoto },
+                                        { text: 'Choose from Library', onPress: handleImageUpload },
+                                        { text: 'Cancel', style: 'cancel' },
+                                    ]
+                                );
+                            }}
+                        >
+                            {user?.profileImage ? (
+                                <Image
+                                    source={{ uri: user.profileImage }}
+                                    style={styles.avatar}
+                                />
+                            ) : (
+                                <View style={[styles.avatarPlaceholder, isDarkMode && styles.avatarPlaceholderDark]}>
+                                    <User size={40} color={isDarkMode ? COLORS.white : COLORS.primary} />
+                                </View>
+                            )}
+                            <View style={styles.cameraButton}>
+                                <Camera size={16} color={COLORS.white} />
+                            </View>
+                        </TouchableOpacity>
+                    </View>
+                    <Text style={[styles.name, isDarkMode && styles.textDark]}>{user?.firstName} {user?.lastName}</Text>
+                    <Text style={[styles.email, isDarkMode && styles.textSecondaryDark]}>{user?.email}</Text>
+                    {user?.dateOfBirth && (
+                        <Text style={[styles.age, isDarkMode && styles.textSecondaryDark]}>
+                            {formatAge(user.dateOfBirth)}
+                        </Text>
+                    )}
+                    <View style={styles.badge}>
+                        <Text style={styles.badgeText}>Patient</Text>
+                    </View>
+>>>>>>> Stashed changes
                 </View>
               )}
               <View style={styles.cameraButton}>
@@ -243,6 +288,7 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
+<<<<<<< Updated upstream
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
@@ -412,4 +458,181 @@ const styles = StyleSheet.create({
   textSecondaryDark: {
     color: '#999999',
   },
+=======
+    container: {
+        flex: 1,
+        backgroundColor: COLORS.background,
+    },
+    containerDark: {
+        backgroundColor: '#1a1a1a',
+    },
+    content: {
+        flex: 1,
+        padding: 16,
+    },
+    profileHeader: {
+        alignItems: 'center',
+        marginBottom: 32,
+    },
+    avatarContainer: {
+        marginBottom: 16,
+    },
+    avatarWrapper: {
+        position: 'relative',
+    },
+    avatar: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+    },
+    avatarPlaceholder: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        backgroundColor: COLORS.white,
+        justifyContent: 'center',
+        alignItems: 'center',
+        ...SHADOWS.medium,
+    },
+    avatarPlaceholderDark: {
+        backgroundColor: '#2a2a2a',
+    },
+    cameraButton: {
+        position: 'absolute',
+        right: 0,
+        bottom: 0,
+        backgroundColor: COLORS.primary,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
+        ...SHADOWS.small,
+    },
+    name: {
+        fontSize: SIZES.xl,
+        fontWeight: 'bold',
+        color: COLORS.textPrimary,
+        marginBottom: 4,
+    },
+    email: {
+        fontSize: SIZES.md,
+        color: COLORS.textSecondary,
+        marginBottom: 4,
+    },
+    age: {
+        fontSize: SIZES.sm,
+        color: COLORS.textSecondary,
+        fontWeight: '500',
+        marginBottom: 8,
+    },
+    badge: {
+        backgroundColor: COLORS.transparentPrimary,
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        borderRadius: 12,
+    },
+    badgeText: {
+        color: COLORS.primary,
+        fontSize: SIZES.sm,
+        fontWeight: '500',
+    },
+    darkModeToggle: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: COLORS.white,
+        padding: 16,
+        borderRadius: 12,
+        marginBottom: 16,
+        ...SHADOWS.medium,
+    },
+    darkModeToggleDark: {
+        backgroundColor: '#2a2a2a',
+    },
+    darkModeIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: COLORS.transparentPrimary,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    darkModeText: {
+        flex: 1,
+        fontSize: SIZES.md,
+        color: COLORS.textPrimary,
+        fontWeight: '500',
+    },
+    menuContainer: {
+        backgroundColor: COLORS.white,
+        borderRadius: 12,
+        ...SHADOWS.medium,
+        marginBottom: 16,
+    },
+    menuContainerDark: {
+        backgroundColor: '#2a2a2a',
+    },
+    menuItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
+    },
+    menuItemDark: {
+        borderBottomColor: '#3a3a3a',
+    },
+    menuItemLast: {
+        borderBottomWidth: 0,
+    },
+    menuIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: COLORS.transparentPrimary,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    menuIconDark: {
+        backgroundColor: '#3a3a3a',
+    },
+    menuTitle: {
+        flex: 1,
+        fontSize: SIZES.md,
+        color: COLORS.textPrimary,
+        fontWeight: '500',
+    },
+    version: {
+        textAlign: 'center',
+        fontSize: SIZES.sm,
+        color: COLORS.textSecondary,
+        marginBottom: 16,
+    },
+    logoutButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 16,
+        backgroundColor: COLORS.white,
+        borderRadius: 12,
+        ...SHADOWS.medium,
+    },
+    logoutButtonDark: {
+        backgroundColor: '#2a2a2a',
+    },
+    logoutText: {
+        marginLeft: 8,
+        fontSize: SIZES.md,
+        color: COLORS.error,
+        fontWeight: '500',
+    },
+    textDark: {
+        color: COLORS.white,
+    },
+    textSecondaryDark: {
+        color: '#999999',
+    },
+>>>>>>> Stashed changes
 });
