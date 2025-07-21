@@ -54,9 +54,36 @@ export const useAuthStore = create<AuthStore>()(
           console.log('Auth Store: State updated successfully');
         } catch (error) {
           console.error('Auth Store: Login error:', error);
+          
+          // Provide user-friendly error messages for common network issues
+          let errorMessage = 'An unknown error occurred';
+          if (error instanceof Error) {
+            if (error.message.includes('Network request failed') || error.message.includes('Unable to connect')) {
+              errorMessage = 'Unable to connect to server. Please check your internet connection and try again.';
+            } else if (error.message.includes('Database connection unavailable') || error.message.includes('Database service unavailable')) {
+              errorMessage = 'Database service is currently unavailable. Please try again in a few minutes.';
+            } else if (error.message.includes('timeout')) {
+              errorMessage = 'Connection timeout. Please try again.';
+            } else if (error.message.includes('401')) {
+              errorMessage = 'Invalid email or password. Please try again.';
+            } else if (error.message.includes('403')) {
+              errorMessage = 'Account access is restricted. Please contact support.';
+            } else if (error.message.includes('404')) {
+              errorMessage = 'Service not found. Please try again later.';
+            } else if (error.message.includes('500')) {
+              errorMessage = 'Server error. Please try again later.';
+            } else if (error.message.includes('503')) {
+              errorMessage = 'Service temporarily unavailable. Please try again in a few minutes.';
+            } else if (error.message.includes('408')) {
+              errorMessage = 'Request timeout. Please check your connection and try again.';
+            } else {
+              errorMessage = error.message;
+            }
+          }
+          
           set({ 
             isLoading: false, 
-            error: error instanceof Error ? error.message : 'An unknown error occurred' 
+            error: errorMessage
           });
         }
       },

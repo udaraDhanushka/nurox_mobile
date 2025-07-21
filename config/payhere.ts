@@ -3,8 +3,8 @@ export const PAYHERE_CONFIG = {
   merchantSecret: 'MTQ3NDkyMzE0MjcyODc3MjQ3MzE1OTAyMDMzOTk1MDg1MTEyODY=', // Will be set in environment
   sandboxMode: true, // Set to false for production
   baseURL: {
-    sandbox: 'https://sandbox.payhere.lk',
-    production: 'https://www.payhere.lk'
+    sandbox: 'https://sandbox.payhere.lk/pay/checkout',
+    // production: 'https://www.payhere.lk'
   },
   currency: 'LKR',
   country: 'LK',
@@ -14,7 +14,8 @@ export const PAYHERE_CONFIG = {
 };
 
 export const getPayHereBaseURL = () => {
-  return PAYHERE_CONFIG.sandboxMode 
-    ? PAYHERE_CONFIG.baseURL.sandbox 
-    : PAYHERE_CONFIG.baseURL.production;
+  if (PAYHERE_CONFIG.sandboxMode) {
+    return PAYHERE_CONFIG.baseURL.sandbox;
+  }
+  // return PAYHERE_CONFIG.baseURL.production;
 };

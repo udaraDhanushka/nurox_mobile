@@ -302,7 +302,18 @@ class ApiService {
           responseData: data,
           errorMessage
         });
-        throw new Error(`[${response.status}] ${errorMessage}`);
+        
+        // Provide specific error messages for common status codes
+        let userFriendlyMessage = errorMessage;
+        if (response.status === 500) {
+          userFriendlyMessage = 'Server error. Please try again later or contact support if the problem persists.';
+        } else if (response.status === 503) {
+          userFriendlyMessage = 'Service temporarily unavailable. Please try again in a few minutes.';
+        } else if (response.status === 502 || response.status === 504) {
+          userFriendlyMessage = 'Server connection issue. Please check your internet connection and try again.';
+        }
+        
+        throw new Error(`[${response.status}] ${userFriendlyMessage}`);
       }
 
       return data;
@@ -427,12 +438,33 @@ export const api = new ApiService();
 export const checkApiHealth = async (): Promise<boolean> => {
   try {
     const baseUrl = __DEV__ ? API_CONFIG.DEV_BASE_URL : API_CONFIG.PROD_BASE_URL;
-    const response = await fetch(`${baseUrl.replace('/api', '')}/health`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+    
+    // Try both /health and /api/health endpoints with timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+    
+    let response;
+    try {
+      // First try /health endpoint
+      response = await fetch(`${baseUrl.replace('/api', '')}/health`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        signal: controller.signal,
+      });
+    } catch (healthError) {
+      // If that fails, try /api/health
+      response = await fetch(`${baseUrl}/health`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        signal: controller.signal,
+      });
+    }
+    
+    clearTimeout(timeoutId);
     return response.ok;
   } catch (error) {
     console.error('API Health check failed:', error);
@@ -449,16 +481,43 @@ export const checkApiHealthDetailed = async (): Promise<{
 }> => {
   try {
     const baseUrl = __DEV__ ? API_CONFIG.DEV_BASE_URL : API_CONFIG.PROD_BASE_URL;
-    const healthUrl = `${baseUrl.replace('/api', '')}/health`;
     
-    console.log('Checking API health at:', healthUrl);
+    // Add timeout and try multiple endpoints
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
     
-    const response = await fetch(healthUrl, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+    let response;
+    let healthUrl;
+    let lastError;
+    
+    try {
+      // First try /health endpoint
+      healthUrl = `${baseUrl.replace('/api', '')}/health`;
+      console.log('Checking API health at:', healthUrl);
+      
+      response = await fetch(healthUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        signal: controller.signal,
+      });
+    } catch (healthError) {
+      lastError = healthError;
+      // If that fails, try /api/health
+      healthUrl = `${baseUrl}/health`;
+      console.log('Retrying API health check at:', healthUrl);
+      
+      response = await fetch(healthUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        signal: controller.signal,
+      });
+    }
+    
+    clearTimeout(timeoutId);
     
     return {
       isHealthy: response.ok,
