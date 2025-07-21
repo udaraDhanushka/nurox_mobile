@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, KeyboardAvoidingView, Platform, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -65,29 +65,17 @@ export default function LoginScreen() {
     const handleLogin = async () => {
         if (validateForm()) {
             try {
-                // First check if the server is reachable
-                const healthCheck = await checkApiHealthDetailed();
-                
-                if (!healthCheck.isHealthy) {
-                    console.error('Server health check failed:', healthCheck);
-                    
-                    // Show more specific error message
-                    const errorMessage = healthCheck.error?.includes('ECONNREFUSED') 
-                        ? 'Unable to connect to server. Please ensure the backend server is running and accessible.'
-                        : healthCheck.error?.includes('ENOTFOUND')
-                        ? 'Server not found. Please check your network connection.'
-                        : 'Server is not responding. Please try again later.';
-                    
-                    Alert.alert(
-                        'Connection Error',
-                        errorMessage,
-                        [
-                            { text: 'OK', style: 'default' }
-                        ]
-                    );
-                    return;
+                // Optional health check - don't block login if health check fails
+                try {
+                    const healthCheck = await checkApiHealthDetailed();
+                    if (!healthCheck.isHealthy) {
+                        console.warn('Server health check failed, but proceeding with login:', healthCheck);
+                    }
+                } catch (healthError) {
+                    console.warn('Health check failed, but proceeding with login:', healthError);
                 }
                 
+                // Proceed with login regardless of health check result
                 await login({ email, password });
             } catch (err) {
                 console.error("Login error:", err);
@@ -96,24 +84,24 @@ export default function LoginScreen() {
     };
 
     // Helper text for demo users
-    const demoUsers = [
-        { role: 'Patient', email: 'patient@example.com' },
-        { role: 'Doctor', email: 'doctor@example.com' },
-        { role: 'Pharmacist', email: 'pharmacist@example.com' }
-    ];
+    // const demoUsers = [
+    //     { role: 'Patient', email: 'patient@example.com' },
+    //     { role: 'Doctor', email: 'doctor@example.com' },
+    //     { role: 'Pharmacist', email: 'pharmacist@example.com' }
+    // ];
 
-    const handleDemoLogin = (demoEmail: string) => {
-        // Set the demo credentials
-        setEmail(demoEmail);
-        setPassword('password123');
+    // const handleDemoLogin = (demoEmail: string) => {
+    //     // Set the demo credentials
+    //     setEmail(demoEmail);
+    //     setPassword('password123');
 
-        // Clear any validation errors
-        setEmailError('');
-        setPasswordError('');
+    //     // Clear any validation errors
+    //     setEmailError('');
+    //     setPasswordError('');
 
-        // Login with the demo credentials
-        login({ email: demoEmail, password: 'password123' });
-    };
+    //     // Login with the demo credentials
+    //     login({ email: demoEmail, password: 'password123' });
+    // };
 
     return (
         <SafeAreaView style={styles.container}>
@@ -168,7 +156,7 @@ export default function LoginScreen() {
                                 <Text style={styles.errorText}>{error}</Text>
                             </View>
                         ) : null}
-
+                        </View>
                         <Button
                             title="Log In"
                             onPress={handleLogin}
@@ -182,9 +170,8 @@ export default function LoginScreen() {
                                 <Text style={styles.registerLink}>Sign Up</Text>
                             </TouchableOpacity>
                         </View>
-                    </View>
 
-                    <View style={styles.demoContainer}>
+                    {/* <View style={styles.demoContainer}>
                         <Text style={styles.demoTitle}>Demo Accounts</Text>
                         <Text style={styles.demoSubtitle}>Use these accounts to explore different roles:</Text>
 
@@ -201,7 +188,7 @@ export default function LoginScreen() {
                             ))}
                         </View>
                         <Text style={styles.demoNote}>Password for all demo accounts: password123</Text>
-                    </View>
+                    </View> */}
                 </ScrollView>
             </KeyboardAvoidingView>
         </SafeAreaView>
@@ -245,6 +232,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     formContainer: {
+        marginTop: 32,
         marginBottom: 24,
     },
     forgotPasswordContainer: {
@@ -268,6 +256,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     button: {
+        marginTop: 40,
         marginBottom: 16,
     },
     registerContainer: {

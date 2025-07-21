@@ -413,13 +413,13 @@ function PaymentScreenContent() {
         )}
       </TouchableOpacity>
       
-      {!useInsurance && (
+      {/* {!useInsurance && (
         <View style={styles.paymentMethodInfo}>
           <Text style={styles.paymentMethodNote}>
             💳 Payment will be processed through PayHere secure gateway
           </Text>
         </View>
-      )}
+      )} */}
     </View>
   );
 

@@ -186,19 +186,11 @@ export default function PayHereWebView({
           <div class="amount">
             <span class="currency">Rs. </span>${amount.toLocaleString('en-LK')}
           </div>
-          <p>Redirecting to PayHere...</p>
-          <div class="loader"></div>
           <form id="payhere-form" action="${baseURL}/pay" method="post">
             ${formFields}
             <button type="submit" class="submit-btn">Pay Now</button>
           </form>
         </div>
-        <script>
-          // Auto-submit the form after a short delay
-          setTimeout(() => {
-            document.getElementById('payhere-form').submit();
-          }, 2000);
-        </script>
       </body>
       </html>
     `;

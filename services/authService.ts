@@ -57,10 +57,18 @@ class AuthService {
   // User logout
   async logout(): Promise<void> {
     try {
-      await api.post('/auth/logout');
+      // Create a promise that resolves quickly to avoid blocking logout
+      const logoutPromise = api.post('/auth/logout');
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Logout timeout')), 5000)
+      );
+      
+      // Race between logout call and timeout
+      await Promise.race([logoutPromise, timeoutPromise]);
     } catch (error) {
       // Even if logout fails on server, we should clear local data
       console.warn('Logout API call failed:', error);
+      // Don't throw the error - logout should always succeed locally
     }
   }
 
