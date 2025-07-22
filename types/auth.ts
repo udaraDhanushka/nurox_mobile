@@ -10,9 +10,6 @@ export interface User {
   role: UserRole;
   profileImage?: string;
   language?: Language;
-  phone?: string;
-  dateOfBirth: string;
-  age?: number; // Calculated from dateOfBirth
   isActive: boolean;
   emailVerified: boolean;
   phoneVerified: boolean;
@@ -151,8 +148,6 @@ export interface RegisterData {
   firstName: string;
   lastName: string;
   role: UserRole;
-  phone?: string;
-  dateOfBirth: string;
   
   // Organization selections
   hospitalId?: string;

@@ -49,24 +49,10 @@ export const useAuthStore = create<AuthStore>()(
             user: authResponse.user ? { id: authResponse.user.id, role: authResponse.user.role } : null,
             hasToken: !!authResponse.accessToken
           });
-          
-          // Calculate age if dateOfBirth is available
-          const userWithAge = authResponse.user.dateOfBirth 
-            ? { ...authResponse.user, age: calculateAge(authResponse.user.dateOfBirth) }
-            : authResponse.user;
-          
-          set({ 
-            user: userWithAge, 
             token: authResponse.accessToken, 
             refreshToken: authResponse.refreshToken,
             isLoading: false 
           });
-          
-          // Cache patient data for cross-app access
-          if (userWithAge.role === 'patient' || userWithAge.role === 'PATIENT') {
-            patientDataService.cachePatientData(userWithAge);
-          }
-          
           console.log('Auth Store: State updated successfully');
         } catch (error) {
           console.error('Auth Store: Login error:', error);
@@ -108,25 +94,12 @@ export const useAuthStore = create<AuthStore>()(
         set({ isLoading: true, error: null });
         try {
           const authResponse = await authService.register(data);
-          
-          // Calculate age if dateOfBirth is available
-          const userWithAge = authResponse.user.dateOfBirth 
-            ? { ...authResponse.user, age: calculateAge(authResponse.user.dateOfBirth) }
-            : authResponse.user;
-          
-          set({ 
-            user: userWithAge, 
             token: authResponse.accessToken, 
             refreshToken: authResponse.refreshToken,
             isLoading: false 
           });
-          
-          // Cache patient data for cross-app access
-          if (userWithAge.role === 'patient' || userWithAge.role === 'PATIENT') {
-            patientDataService.cachePatientData(userWithAge);
-          }
-          
           return Promise.resolve();
+        
         } catch (error) {
           set({ 
             isLoading: false, 
@@ -189,19 +162,6 @@ export const useAuthStore = create<AuthStore>()(
         try {
           const updated = await authService.updateProfile(updatedUser);
           
-          // Calculate age if dateOfBirth is available
-          const userWithAge = updated.dateOfBirth 
-            ? { ...updated, age: calculateAge(updated.dateOfBirth) }
-            : updated;
-          
-          set({ user: userWithAge });
-
-          // Cache patient data for cross-app access and broadcast update
-          if (userWithAge.role === 'patient' || userWithAge.role === 'PATIENT') {
-            patientDataService.cachePatientData(userWithAge);
-            await dataSyncService.onPatientProfileUpdated(userWithAge.id, updatedUser, userWithAge);
-            await patientSyncBroadcast.broadcastPatientUpdate(userWithAge.id, userWithAge);
-          }
         } catch (error) {
           console.error('Update user error:', error);
           throw error;

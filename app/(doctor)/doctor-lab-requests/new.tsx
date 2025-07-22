@@ -24,8 +24,6 @@ export default function NewLabRequestScreen() {
   const [clinicalNotes, setClinicalNotes] = useState('');
   const [symptoms, setSymptoms] = useState('');
   const [expectedDate, setExpectedDate] = useState('');
-  
-  const labTestTemplates = getLabTestTemplates();
 
   // Pre-fill patient information if coming from patient detail screen
   useEffect(() => {
@@ -37,16 +35,6 @@ export default function NewLabRequestScreen() {
     }
   }, [patientName, patientId]);
 
-  const handleTestSelect = (test: Test | string) => {
-    let testName: string;
-    
-    if (typeof test === 'string') {
-      testName = test;
-    } else {
-      testName = test.name;
-    }
-
-    // Check if already selected
     if (selectedTests.includes(testName)) {
       Alert.alert('Test Already Added', 'This test is already in the request.');
       return;
@@ -213,15 +201,6 @@ export default function NewLabRequestScreen() {
 
         {/* Lab Tests */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Lab Tests</Text>
-          
-          {/* Hybrid Test Input */}
-          <HybridTestInput
-            value=""
-            onSelect={handleTestSelect}
-            placeholder="Select test from list or type manually"
-            label="Add Test"
-          />
 
           {selectedTests.length > 0 ? (
             <View style={styles.selectedTestsContainer}>

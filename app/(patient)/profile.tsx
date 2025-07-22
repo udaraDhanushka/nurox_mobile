@@ -169,14 +169,6 @@ export default function ProfileScreen() {
                     </View>
                     <Text style={[styles.name, isDarkMode && styles.textDark]}>{user?.firstName} {user?.lastName}</Text>
                     <Text style={[styles.email, isDarkMode && styles.textSecondaryDark]}>{user?.email}</Text>
-                    {user?.dateOfBirth && (
-                        <Text style={[styles.age, isDarkMode && styles.textSecondaryDark]}>
-                            {formatAge(user.dateOfBirth)}
-                        </Text>
-                    )}
-                    <View style={styles.badge}>
-                        <Text style={styles.badgeText}>Patient</Text>
-                    </View>
                 </View>
 
         {/* 2. Dark/Light Toggle */}

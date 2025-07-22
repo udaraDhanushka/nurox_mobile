@@ -8,7 +8,6 @@ const isProduction = !__DEV__;
 // API Configuration
 export const API_CONFIG = {
   BASE_URL: isDevelopment 
-    ? 'http://10.83.114.223:3000/api'
     : 'https://api.medapp.com',
   
   ENDPOINTS: {
