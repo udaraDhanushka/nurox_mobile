@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, Modal, Dimensions } from 'react-native';
-import { Calendar, X, Check } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Calendar, X } from 'lucide-react-native';
 import { COLORS, SIZES, SHADOWS } from '@/constants/theme';
 import { Button } from '@/components/Button';
 
@@ -22,7 +23,7 @@ interface DatePickerModalProps {
   maxDaysAhead?: number;
 }
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 export const DatePickerModal: React.FC<DatePickerModalProps> = ({
   visible,
@@ -33,6 +34,7 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
   maxDaysAhead = 30
 }) => {
   const [tempSelectedDate, setTempSelectedDate] = useState(selectedDate);
+  const insets = useSafeAreaInsets();
 
   const generateDates = (): DateOption[] => {
     const dates: DateOption[] = [];
@@ -199,7 +201,10 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
       onRequestClose={handleCancel}
     >
       <View style={styles.overlay}>
-        <View style={styles.modalContainer}>
+        <View style={[styles.modalContainer, { 
+          marginTop: Math.max(insets.top + 20, 40), 
+          marginBottom: Math.max(insets.bottom + 20, 40) 
+        }]}>
           {/* Header */}
           <View style={styles.header}>
             <TouchableOpacity 
@@ -314,7 +319,7 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
           )}
 
           {/* Action Buttons */}
-          <View style={styles.actionButtons}>
+          <View style={[styles.actionButtons, { paddingBottom: Math.max(insets.bottom, 10) }]}>
             <Button
               title="Cancel"
               variant="outline"
@@ -347,7 +352,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     width: width - 40,
     maxWidth: 400,
-    maxHeight: '80%',
+    maxHeight: height * 0.75,
     ...SHADOWS.medium,
   },
   header: {
@@ -511,7 +516,9 @@ const styles = StyleSheet.create({
   actionButtons: {
     flexDirection: 'row',
     gap: 12,
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 20,
   },
   cancelButton: {
     flex: 1,

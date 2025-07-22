@@ -499,28 +499,43 @@ export const checkApiHealth = async (): Promise<boolean> => {
   }
 };
 
-// Enhanced health check with detailed response
-export const checkApiHealthDetailed = async (): Promise<{ 
+// Optional health check - disabled by default to prevent login interference  
+export const checkApiHealthDetailed = async (options?: { 
+  enabled?: boolean;
+  timeout?: number;
+  silent?: boolean;
+}): Promise<{ 
   isHealthy: boolean; 
   error?: string; 
   status?: number; 
   baseUrl: string; 
 }> => {
+  const { enabled = false, timeout = 3000, silent = false } = options || {};
+  
+  // Return healthy status if disabled
+  if (!enabled) {
+    return {
+      isHealthy: true,
+      status: 200,
+      baseUrl: __DEV__ ? API_CONFIG.DEV_BASE_URL : API_CONFIG.PROD_BASE_URL,
+    };
+  }
+
   try {
     const baseUrl = __DEV__ ? API_CONFIG.DEV_BASE_URL : API_CONFIG.PROD_BASE_URL;
     
-    // Add timeout and try multiple endpoints
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
     
     let response;
     let healthUrl;
-    let lastError;
     
     try {
-      // First try /health endpoint
-      healthUrl = `${baseUrl.replace('/api', '')}/health`;
-      console.log('Checking API health at:', healthUrl);
+      // First try basic API endpoint as health check
+      healthUrl = `${baseUrl}/auth/me`;
+      if (!silent && __DEV__) {
+        console.log('Checking API availability at:', healthUrl);
+      }
       
       response = await fetch(healthUrl, {
         method: 'GET',
@@ -530,10 +545,11 @@ export const checkApiHealthDetailed = async (): Promise<{
         signal: controller.signal,
       });
     } catch (healthError) {
-      lastError = healthError;
-      // If that fails, try /api/health
-      healthUrl = `${baseUrl}/health`;
-      console.log('Retrying API health check at:', healthUrl);
+      // Try health endpoint if available
+      healthUrl = `${baseUrl.replace('/api', '')}/health`;
+      if (!silent && __DEV__) {
+        console.log('Retrying health check at:', healthUrl);
+      }
       
       response = await fetch(healthUrl, {
         method: 'GET',
@@ -547,15 +563,17 @@ export const checkApiHealthDetailed = async (): Promise<{
     clearTimeout(timeoutId);
     
     return {
-      isHealthy: response.ok,
+      isHealthy: response.status < 500, // Accept 401/403 as healthy (server is responding)
       status: response.status,
       baseUrl: healthUrl,
     };
   } catch (error) {
-    console.error('API Health check failed:', error);
+    if (!silent && __DEV__) {
+      console.warn('API Health check failed (non-blocking):', error);
+    }
     return {
       isHealthy: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: error instanceof Error ? error.message : 'Health check unavailable',
       baseUrl: __DEV__ ? API_CONFIG.DEV_BASE_URL : API_CONFIG.PROD_BASE_URL,
     };
   }

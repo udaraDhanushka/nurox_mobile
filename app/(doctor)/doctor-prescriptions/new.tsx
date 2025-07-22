@@ -9,6 +9,7 @@ import { useMedicineStore, Medicine } from '@/store/medicineStore';
 import { HybridMedicineInput } from '@/components/HybridMedicineInput';
 import { useMedicalStore } from '../../../store/medicalStore';
 import { useNotificationStore } from '../../../store/notificationStore';
+import { useAuthStore } from '../../../store/authStore';
 
 interface SelectedMedicine {
   medicine: Medicine | string; // Can be Medicine object or string for manual entry
@@ -25,6 +26,7 @@ export default function NewPrescriptionScreen() {
   const { medicines, searchMedicines, loadMedicines, isLoading } = useMedicineStore();
   const { addPrescription } = useMedicalStore();
   const { addNotification } = useNotificationStore();
+  const { user, getUserDisplayName } = useAuthStore();
   
   const [patientNameInput, setPatientNameInput] = useState('');
   const [patientIdInput, setPatientIdInput] = useState('');
@@ -142,7 +144,7 @@ export default function NewPrescriptionScreen() {
     const newPrescription = {
       id: Math.random().toString(36).substring(2, 9),
       date: new Date().toISOString().split('T')[0],
-      doctorName: 'Dr. Sarah Johnson', // This would come from auth context
+      doctorName: getUserDisplayName() || `Dr. ${user?.firstName} ${user?.lastName}` || 'Unknown Doctor',
       patientName: patientNameInput,
       patientId: patientIdInput,
       condition,
@@ -164,7 +166,7 @@ export default function NewPrescriptionScreen() {
     // Add notification for the patient
     addNotification({
       title: 'New Prescription',
-      message: `Dr. Sarah Johnson has prescribed new medication for ${condition}`,
+      message: `${getUserDisplayName() || 'Your doctor'} has prescribed new medication for ${condition}`,
       type: 'prescription',
       priority: 'high'
     });

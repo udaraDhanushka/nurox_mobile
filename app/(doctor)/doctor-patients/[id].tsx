@@ -12,8 +12,6 @@ import { calculateAge, formatAge } from '../../../utils/dateUtils';
 import { usePatientDataSync } from '../../../hooks/usePatientDataSync';
 import { useSpecificPatientSync } from '../../../hooks/usePatientSyncListener';
 
-// Mock data removed - now using real patient data from API via patientService
-
 export default function DoctorPatientDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();

@@ -7,7 +7,6 @@ import { COLORS, SIZES } from '../../constants/theme';
 import { Input } from '../../components/Input';
 import { Button } from '../../components/Button';
 import { useAuthStore } from '../../store/authStore';
-import { checkApiHealthDetailed } from '../../services/api';
 
 export default function LoginScreen() {
     const router = useRouter();
@@ -65,17 +64,7 @@ export default function LoginScreen() {
     const handleLogin = async () => {
         if (validateForm()) {
             try {
-                // Optional health check - don't block login if health check fails
-                try {
-                    const healthCheck = await checkApiHealthDetailed();
-                    if (!healthCheck.isHealthy) {
-                        console.warn('Server health check failed, but proceeding with login:', healthCheck);
-                    }
-                } catch (healthError) {
-                    console.warn('Health check failed, but proceeding with login:', healthError);
-                }
-                
-                // Proceed with login regardless of health check result
+                // Proceed with login directly - health check is disabled to prevent errors
                 await login({ email, password });
             } catch (err) {
                 console.error("Login error:", err);

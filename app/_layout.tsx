@@ -22,12 +22,12 @@ export default function RootLayout() {
   const [loaded, error] = useFonts({
     FontAwesome: require("@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome.ttf"),
   });
-  
+
   // Get the authentication state
   const { token, user, checkTokenExpiration } = useAuthStore();
   const segments = useSegments();
   const router = useRouter();
-  
+
   // Initialize socket connection for authenticated users
   useSocket();
 
@@ -36,12 +36,12 @@ export default function RootLayout() {
     if (!loaded) return;
 
     const inAuthGroup = segments[0] === "(auth)";
-    
+
     // Temporarily disable token expiration check to debug Buffer issue
     // TODO: Re-enable this after fixing the Buffer issue
     // const tokensExpired = checkTokenExpiration();
     const tokensExpired = false;
-    
+
     // Add a small delay to avoid race conditions during logout
     const timeoutId = setTimeout(() => {
       // If tokens are expired, redirect to auth
@@ -50,7 +50,7 @@ export default function RootLayout() {
         router.replace("/(auth)");
         return;
       }
-      
+
       // If user is authenticated and in auth group, redirect to appropriate dashboard
       if (token && user && inAuthGroup) {
         const userRole = user.role.toLowerCase();
@@ -61,7 +61,7 @@ export default function RootLayout() {
         } else if (userRole === 'pharmacist') {
           router.replace("/(pharmacist)");
         }
-      } 
+      }
       // If user is not authenticated and not in auth group, redirect to auth
       else if (!token && !inAuthGroup) {
         router.replace("/(auth)");
@@ -90,10 +90,10 @@ export default function RootLayout() {
   useEffect(() => {
     const handleDeepLink = (url: string) => {
       console.log('Deep link received:', url);
-      
+
       if (isPaymentDeepLink(url)) {
         const params = parseUrlParams(url);
-        
+
         if (url.includes('/payments/success')) {
           router.push({
             pathname: '/(patient)/payment-success',
@@ -101,7 +101,7 @@ export default function RootLayout() {
           });
         } else if (url.includes('/payments/failure')) {
           router.push({
-            pathname: '/(patient)/payment-failure', 
+            pathname: '/(patient)/payment-failure',
             params: params as any
           });
         }

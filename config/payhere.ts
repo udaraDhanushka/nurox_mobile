@@ -1,7 +1,7 @@
 export const PAYHERE_CONFIG = {
   merchantId: '1231130', // PayHere Sandbox Merchant ID
-  merchantSecret: 'MTQ3NDkyMzE0MjcyODc3MjQ3MzE1OTAyMDMzOTk1MDg1MTEyODY=', // Will be set in environment
-  sandboxMode: true, // Set to false for production
+  merchantSecret: 'MTQ3NDkyMzE0MjcyODc3MjQ3MzE1OTAyMDMzOTk1MDg1MTEyODY=', 
+  sandboxMode: true,
   baseURL: {
     sandbox: 'https://sandbox.payhere.lk/pay/checkout',
     // production: 'https://www.payhere.lk'
@@ -10,7 +10,7 @@ export const PAYHERE_CONFIG = {
   country: 'LK',
   returnURL: 'nurox://payments/success',
   cancelURL: 'nurox://payments/cancel',
-  notifyURL: 'http://10.83.114.223:3000/api/payments/payhere-webhook', // Updated with actual backend URL
+  notifyURL: 'http://10.83.114.223:3000/api/payments/payhere-webhook',
 };
 
 export const getPayHereBaseURL = () => {

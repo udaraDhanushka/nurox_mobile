@@ -7,6 +7,8 @@ import { ArrowLeft, Calendar, Clock, MapPin, User, FileText, ChevronDown, Buildi
 import { COLORS, SIZES, SHADOWS } from '../../../constants/theme';
 import { Button } from '../../../components/Button';
 import { DatePickerModal } from '../../../components/ui/DatePickerModal';
+import { PaymentCheckout } from '../../../components/ui/PaymentCheckout';
+import type { AppointmentPaymentData } from '@/services/payhereService';
 import { useAppointmentStore } from '../../../store/appointmentStore';
 import { Hospital, TokenSlot, AppointmentType } from '../../../types/appointment';
 import { appointmentService } from '../../../services/appointmentService';
@@ -65,6 +67,10 @@ export default function NewAppointmentScreen() {
   const [showDatePickerModal, setShowDatePickerModal] = useState(false);
   const [isBooking, setIsBooking] = useState(false);
   const [apiDoctors, setApiDoctors] = useState<any[]>([]);
+  
+  // Payment state
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [appointmentPaymentData, setAppointmentPaymentData] = useState<AppointmentPaymentData | null>(null);
   const [isLoadingDoctors, setIsLoadingDoctors] = useState(false);
   const [doctorNameFilter, setDoctorNameFilter] = useState('');
   const [selectedSpecialization, setSelectedSpecialization] = useState('');
@@ -393,31 +399,30 @@ export default function NewAppointmentScreen() {
       // Add to local store for immediate UI feedback
       addAppointment(localAppointment);
       
-      Alert.alert(
-        'Appointment Booked! 🎉',
-        `Your appointment has been scheduled:\n\nDoctor: ${selectedDoctor.name}\nDate: ${selectedDate}\nToken: #${selectedToken.tokenNumber}\nTime: ${selectedToken.time}\n\nNote: This appointment will be visible to your doctor only after payment confirmation.`,
-        [
-          {
-            text: 'Proceed to Payment',
-            onPress: () => {
-              resetForm();
-              // Navigate to payment screen with appointment details
-              router.push({
-                pathname: '/(patient)/payments',
-                params: {
-                  appointmentId: createdAppointment.id,
-                  doctorName: selectedDoctor.name,
-                  specialty: selectedDoctor.specialty,
-                  hospitalName: selectedHospital.name,
-                  date: selectedDate,
-                  time: selectedToken.time,
-                  tokenNumber: selectedToken.tokenNumber
-                }
-              });
-            }
-          }
-        ]
-      );
+      // Prepare payment data
+      const paymentData: AppointmentPaymentData = {
+        appointmentId: createdAppointment.id,
+        doctorId: selectedDoctor.id,
+        doctorName: selectedDoctor.name,
+        specialty: selectedDoctor.specialty,
+        appointmentDate: selectedDate,
+        appointmentTime: selectedToken.time,
+        consultationFee: selectedDoctor.consultationFee || 2500, // Default fee if not available
+        hospitalFee: selectedHospital.fee || 0,
+        totalAmount: 0, // Will be calculated by the payment service
+        patientInfo: {
+          firstName: user.firstName || user.email?.split('@')[0] || 'Patient',
+          lastName: user.lastName || '',
+          email: user.email || '',
+          phone: user.phone || '',
+          address: user.address || 'Colombo, Sri Lanka',
+          city: 'Colombo',
+          country: 'LK'
+        }
+      };
+
+      setAppointmentPaymentData(paymentData);
+      setShowPaymentModal(true);
     } catch (error) {
       console.error('Failed to create appointment:', error);
       
@@ -438,6 +443,71 @@ export default function NewAppointmentScreen() {
     } finally {
       setIsBooking(false);
     }
+  };
+
+  const handlePaymentSuccess = (paymentData: any) => {
+    setShowPaymentModal(false);
+    setAppointmentPaymentData(null);
+    
+    Alert.alert(
+      'Payment Successful! 🎉',
+      'Your appointment payment has been processed successfully. You will receive a confirmation shortly.',
+      [
+        {
+          text: 'View Appointments',
+          onPress: () => {
+            resetForm();
+            router.push('/(patient)/(tabs)/appointments');
+          }
+        }
+      ]
+    );
+  };
+
+  const handlePaymentCancel = () => {
+    setShowPaymentModal(false);
+    setAppointmentPaymentData(null);
+    
+    Alert.alert(
+      'Payment Cancelled',
+      'Your appointment has been booked but payment is still pending. You can complete the payment later from your appointments.',
+      [
+        {
+          text: 'OK',
+          onPress: () => {
+            resetForm();
+            router.push('/(patient)/(tabs)/appointments');
+          }
+        }
+      ]
+    );
+  };
+
+  const handlePaymentError = (error: string) => {
+    setShowPaymentModal(false);
+    setAppointmentPaymentData(null);
+    
+    Alert.alert(
+      'Payment Failed',
+      `Payment could not be processed: ${error}\n\nYour appointment is still booked. You can try payment again from your appointments.`,
+      [
+        {
+          text: 'Try Again',
+          onPress: () => {
+            if (appointmentPaymentData) {
+              setShowPaymentModal(true);
+            }
+          }
+        },
+        {
+          text: 'Later',
+          onPress: () => {
+            resetForm();
+            router.push('/(patient)/(tabs)/appointments');
+          }
+        }
+      ]
+    );
   };
 
   const renderStepIndicator = () => (
@@ -900,6 +970,17 @@ export default function NewAppointmentScreen() {
         onClose={() => setShowDatePickerModal(false)}
         maxDaysAhead={14}
       />
+
+      {/* Payment Checkout Modal */}
+      {appointmentPaymentData && (
+        <PaymentCheckout
+          visible={showPaymentModal}
+          appointmentData={appointmentPaymentData}
+          onSuccess={handlePaymentSuccess}
+          onCancel={handlePaymentCancel}
+          onError={handlePaymentError}
+        />
+      )}
     </SafeAreaView>
   );
 }

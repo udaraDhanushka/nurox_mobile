@@ -5,15 +5,15 @@ export const API_CONFIG = {
   PROD_BASE_URL: 'https://your-production-api.com/api',
   
   // Feature flags for data sources
-  USE_MOCK_DATA: false, // Set to true only for development testing
-  FORCE_REAL_DATA: true, // Always use real API data
+  USE_MOCK_DATA: false, 
+  FORCE_REAL_DATA: true,
   
   // Socket URLs
   DEV_SOCKET_URL: 'http://10.83.114.223:3000',
   PROD_SOCKET_URL: 'https://your-production-api.com',
   
   // Request timeouts (in milliseconds)
-  TIMEOUT: 45000, // Increased for mobile development
+  TIMEOUT: 45000, 
   UPLOAD_TIMEOUT: 90000,
   
   // File upload limits
@@ -26,10 +26,10 @@ export const API_CONFIG = {
   RETRY_DELAY: 1000,
   
   // Cache configuration
-  CACHE_DURATION: 5 * 60 * 1000, // 5 minutes
+  CACHE_DURATION: 5 * 60 * 1000, 
   
   // API rate limits
-  RATE_LIMIT_WINDOW: 60000, // 1 minute
+  RATE_LIMIT_WINDOW: 60000, 
   RATE_LIMIT_MAX_REQUESTS: 100,
 };
 

@@ -10,12 +10,14 @@ import { useNotificationStore } from '../../../store/notificationStore';
 import { LabTestTemplate, LabTestRequest } from '../../../types/medical';
 import { HybridTestInput } from '../../../components/HybridTestInput';
 import { Test } from '../../../services/testService';
+import { useAuthStore } from '../../../store/authStore';
 
 export default function NewLabRequestScreen() {
   const router = useRouter();
   const { patientId, patientName } = useLocalSearchParams();
   const { addLabTestRequest, getLabTestTemplates, addNotification } = useMedicalStore();
   const { addNotification: addAppNotification } = useNotificationStore();
+  const { user, getUserDisplayName } = useAuthStore();
   
   const [patientNameInput, setPatientNameInput] = useState('');
   const [patientIdInput, setPatientIdInput] = useState('');
@@ -86,8 +88,8 @@ export default function NewLabRequestScreen() {
       id: Math.random().toString(36).substring(2, 9),
       patientId: patientIdInput,
       patientName: patientNameInput,
-      doctorId: 'doctor_123', // This would come from auth context
-      doctorName: 'Dr. Sarah Johnson', // This would come from auth context
+      doctorId: user?.id || 'unknown',
+      doctorName: getUserDisplayName() || `Dr. ${user?.firstName} ${user?.lastName}` || 'Unknown Doctor',
       requestedTests: selectedTests,
       priority,
       clinicalNotes,
@@ -103,7 +105,7 @@ export default function NewLabRequestScreen() {
     // Add notification for the patient
     addAppNotification({
       title: 'New Lab Test Request',
-      message: `Dr. Sarah Johnson has requested lab tests: ${selectedTests.slice(0, 2).join(', ')}${selectedTests.length > 2 ? ` +${selectedTests.length - 2} more` : ''}`,
+      message: `${getUserDisplayName() || 'Your doctor'} has requested lab tests: ${selectedTests.slice(0, 2).join(', ')}${selectedTests.length > 2 ? ` +${selectedTests.length - 2} more` : ''}`,
       type: 'lab',
       priority: priority === 'stat' ? 'high' : priority === 'urgent' ? 'medium' : 'low'
     });
