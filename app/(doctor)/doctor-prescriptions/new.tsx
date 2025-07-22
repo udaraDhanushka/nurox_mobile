@@ -6,6 +6,7 @@ import { ArrowLeft, Search, Plus, X, User, FileText } from 'lucide-react-native'
 import { COLORS, SIZES, SHADOWS } from '../../../constants/theme';
 import { Button } from '../../../components/Button';
 import { useMedicineStore, Medicine } from '@/store/medicineStore';
+import { HybridMedicineInput } from '@/components/HybridMedicineInput';
 import { useMedicalStore } from '../../../store/medicalStore';
 import { useNotificationStore } from '../../../store/notificationStore';
 
@@ -45,6 +46,7 @@ export default function NewPrescriptionScreen() {
 
     const newSelection: SelectedMedicine = {
       medicine,
+      medicineDisplay,
       dosage: '',
       frequency: '',
       duration: '',

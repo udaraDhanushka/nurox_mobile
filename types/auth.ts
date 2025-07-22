@@ -76,6 +76,7 @@ export interface PatientProfile {
   occupation?: string;
   address?: string;
   city?: string;
+  state?: string;
   zipCode?: string;
   country?: string;
   insuranceProvider?: string;

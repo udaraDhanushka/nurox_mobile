@@ -4,7 +4,6 @@ async function testLogin() {
   const { default: fetch } = await import('node-fetch');
   try {
     console.log('Testing login request...');
-   
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

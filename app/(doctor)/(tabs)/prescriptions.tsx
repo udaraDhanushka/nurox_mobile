@@ -144,30 +144,6 @@ export default function DoctorPrescriptionsScreen() {
 
       {/* Prescriptions List */}
       <ScrollView style={styles.prescriptionsList} showsVerticalScrollIndicator={false}>
-<<<<<<< Updated upstream
-        {filteredPrescriptions.map((prescription) => (
-          <TouchableOpacity
-            key={prescription.id}
-            style={styles.prescriptionCard}
-            onPress={() => router.push({
-              pathname: '/(doctor)/doctor-prescriptions/[id]',
-              params: {id: prescription.id}
-            })}
-          >
-            <View style={styles.prescriptionHeader}>
-              <Image source={{ uri: prescription.patientImage }} style={styles.patientImage} />
-              <View style={styles.prescriptionInfo}>
-                <Text style={styles.patientName}>{prescription.patientName}</Text>
-                <Text style={styles.condition}>{prescription.condition}</Text>
-              </View>
-              <View style={[
-                styles.statusBadge,
-                { backgroundColor: getStatusColor(prescription.status) + '20' }
-              ]}>
-                <Text style={[
-                  styles.statusText,
-                  { color: getStatusColor(prescription.status) }
-=======
         {isLoading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={COLORS.primary} />
@@ -220,7 +196,6 @@ export default function DoctorPrescriptionsScreen() {
                 <View style={[
                   styles.statusBadge,
                   { backgroundColor: getStatusColor(prescription.status) + '20' }
->>>>>>> Stashed changes
                 ]}>
                   <Text style={[
                     styles.statusText,

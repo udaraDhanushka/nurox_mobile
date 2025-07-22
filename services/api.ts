@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { API_CONFIG } from '../constants/api';
+import { getDynamicAPIBaseURL } from '../utils/networkUtils';
 
 
 // API Configuration
@@ -214,7 +215,6 @@ class ApiService {
       //     throw new Error('Session expired - please log in again');
       //   }
       // }
-
       const headers = await this.createHeaders(includeAuth);
 
       const config: RequestInit = {

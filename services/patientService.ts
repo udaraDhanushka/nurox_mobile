@@ -1,5 +1,8 @@
 import { appointmentService } from './appointmentService';
 import { Patient, DetailedPatient, ApiAppointment } from '../types/appointment';
+import { patientDataService } from './patientDataService';
+import { calculateAge, formatAge } from '../utils/dateUtils';
+
 
   private transformAppointmentPatientsToPatientList(
     appointments: ApiAppointment[],

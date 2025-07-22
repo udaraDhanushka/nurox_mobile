@@ -301,6 +301,12 @@ const styles = StyleSheet.create({
     email: {
         fontSize: SIZES.md,
         color: COLORS.textSecondary,
+        marginBottom: 4,
+    },
+    age: {
+        fontSize: SIZES.sm,
+        color: COLORS.textSecondary,
+        fontWeight: '500',
         marginBottom: 8,
     },
     badge: {

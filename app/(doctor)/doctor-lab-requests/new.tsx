@@ -8,6 +8,8 @@ import { Button } from '../../../components/Button';
 import { useMedicalStore } from '../../../store/medicalStore';
 import { useNotificationStore } from '../../../store/notificationStore';
 import { LabTestTemplate, LabTestRequest } from '../../../types/medical';
+import { HybridTestInput } from '../../../components/HybridTestInput';
+import { Test } from '../../../services/testService';
 
 export default function NewLabRequestScreen() {
   const router = useRouter();
@@ -22,7 +24,6 @@ export default function NewLabRequestScreen() {
   const [clinicalNotes, setClinicalNotes] = useState('');
   const [symptoms, setSymptoms] = useState('');
   const [expectedDate, setExpectedDate] = useState('');
-
 
   // Pre-fill patient information if coming from patient detail screen
   useEffect(() => {
@@ -310,7 +311,6 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 24,
   },
-
   sectionTitle: {
     fontSize: SIZES.md,
     fontWeight: '600',
@@ -366,7 +366,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: COLORS.textPrimary,
   },
-
   selectedTestsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -399,5 +398,4 @@ const styles = StyleSheet.create({
   createButton: {
     marginBottom: 24,
   },
-
 });

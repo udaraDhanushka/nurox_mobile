@@ -1,7 +1,6 @@
 import { io, Socket } from 'socket.io-client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-
 const SOCKET_URL = __DEV__ 
   ? API_CONFIG.DEV_SOCKET_URL  // Development - Use network IP for mobile devices
   : API_CONFIG.PROD_SOCKET_URL; // Production
@@ -12,6 +11,23 @@ class SocketService {
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 3;
   private isConnecting = false;
+  private dynamicSocketURL: string | null = null;
+
+  private async getSocketURL(): Promise<string> {
+    if (__DEV__) {
+      if (!this.dynamicSocketURL) {
+        try {
+          this.dynamicSocketURL = await getDynamicSocketURL();
+        } catch (error) {
+          console.error('Failed to get dynamic socket URL:', error);
+          this.dynamicSocketURL = SOCKET_URL;
+        }
+      }
+      return this.dynamicSocketURL;
+    } else {
+      return SOCKET_URL;
+    }
+  }
 
   async connect(userId: string): Promise<void> {
     if (this.socket?.connected || this.isConnecting) {
@@ -29,9 +45,7 @@ class SocketService {
       if (authData) {
         const parsed = JSON.parse(authData);
         token = parsed.state?.token;
-      }
-
-        auth: {
+      } auth: {
           token,
           userId
         },

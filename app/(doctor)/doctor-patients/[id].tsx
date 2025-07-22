@@ -8,6 +8,9 @@ import { Button } from '../../../components/Button';
 import { patientService } from '../../../services/patientService';
 import { useAuthStore } from '../../../store/authStore';
 import { DetailedPatient } from '../../../types/appointment';
+import { calculateAge, formatAge } from '../../../utils/dateUtils';
+import { usePatientDataSync } from '../../../hooks/usePatientDataSync';
+import { useSpecificPatientSync } from '../../../hooks/usePatientSyncListener';
 
 // Mock data removed - now using real patient data from API via patientService
 
@@ -19,7 +22,6 @@ export default function DoctorPatientDetailScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-
   const patientId = Array.isArray(id) ? id[0] : id;
   
   useEffect(() => {
@@ -37,7 +39,6 @@ export default function DoctorPatientDetailScreen() {
       
       const patientDetails = await patientService.getPatientById(patientId, user.id);
       if (patientDetails) {
-
       } else {
         setError('Patient not found or not associated with your appointments');
       }

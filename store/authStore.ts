@@ -4,6 +4,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthState, LoginCredentials, RegisterData, ResetPasswordData, NewPasswordData, User, UserRole } from '../types/auth';
 import { Language } from './languageStore';
 import { authService } from '../services/authService';
+import { calculateAge } from '../utils/dateUtils';
+import { dataSyncService } from '../services/dataSyncService';
+import { patientDataService } from '../services/patientDataService';
+import { patientSyncBroadcast } from '../services/patientSyncBroadcast';
 
 interface AuthStore extends AuthState {
   login: (credentials: LoginCredentials) => Promise<void>;
@@ -49,7 +53,6 @@ export const useAuthStore = create<AuthStore>()(
             refreshToken: authResponse.refreshToken,
             isLoading: false 
           });
-        
           console.log('Auth Store: State updated successfully');
         } catch (error) {
           console.error('Auth Store: Login error:', error);
@@ -91,12 +94,10 @@ export const useAuthStore = create<AuthStore>()(
         set({ isLoading: true, error: null });
         try {
           const authResponse = await authService.register(data);
-
             token: authResponse.accessToken, 
             refreshToken: authResponse.refreshToken,
             isLoading: false 
           });
-
           return Promise.resolve();
         
         } catch (error) {

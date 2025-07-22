@@ -9,6 +9,16 @@ import { useAuthStore } from '@/store/authStore';
 import { authService } from '@/services/authService';
 import { Input } from '@/components/Input';
 import { Button } from '@/components/Button';
+import { calculateAge, formatAge, validateDateOfBirth, formatDateForInput } from '@/utils/dateUtils';
+
+interface FormField {
+  label: string;
+  key: string;
+  placeholder: string;
+  required?: boolean;
+  keyboardType?: string;
+  disabled?: boolean;
+}
 
 export default function PersonalInformationScreen() {
   const router = useRouter();
@@ -23,7 +33,7 @@ export default function PersonalInformationScreen() {
     city: user?.patientProfile?.city || '',
     state: user?.patientProfile?.state || '',
     zipCode: user?.patientProfile?.zipCode || '',
-    dateOfBirth: user?.dateOfBirth ? new Date(user.dateOfBirth).toLocaleDateString() : '',
+    dateOfBirth: user?.dateOfBirth ? formatDateForInput(user.dateOfBirth) : '',
     emergencyContact: user?.patientProfile?.emergencyContact || '',
     emergencyPhone: user?.patientProfile?.emergencyPhone || '',
   });
@@ -59,6 +69,13 @@ export default function PersonalInformationScreen() {
       return;
     }
 
+    // Validate date of birth
+    const dobValidation = validateDateOfBirth(formData.dateOfBirth);
+    if (!dobValidation.isValid) {
+      Alert.alert('Validation Error', dobValidation.error || 'Please enter a valid date of birth.');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -70,7 +87,9 @@ export default function PersonalInformationScreen() {
 
       // Add optional user fields if they have values
       if (formData.phone.trim()) userUpdateData.phone = formData.phone.trim();
-      if (formData.dateOfBirth.trim()) userUpdateData.dateOfBirth = formData.dateOfBirth.trim();
+      
+      // Date of birth is now mandatory
+      userUpdateData.dateOfBirth = formData.dateOfBirth.trim();
 
       // Update patient profile (address and emergency contact info)
       const patientUpdateData: any = {};
@@ -109,7 +128,11 @@ export default function PersonalInformationScreen() {
     }
   };
 
-  const formSections = [
+  const formSections: Array<{
+    title: string;
+    icon: React.ReactElement;
+    fields: FormField[];
+  }> = [
     {
       title: 'Basic Information',
       icon: <User size={20} color={COLORS.primary} />,
@@ -143,7 +166,8 @@ export default function PersonalInformationScreen() {
         {
           label: 'Date of Birth',
           key: 'dateOfBirth',
-          placeholder: 'MM/DD/YYYY',
+          placeholder: 'YYYY-MM-DD',
+          required: true,
         },
       ],
     },
@@ -220,19 +244,29 @@ export default function PersonalInformationScreen() {
               
               <View style={styles.sectionContent}>
                 {section.fields.map((field, fieldIndex) => (
-                  <View key={field.key} style={styles.fieldContainer}>
-                    <Text style={styles.fieldLabel}>
-                      {field.label}
-                      {field.required && <Text style={styles.required}> *</Text>}
-                    </Text>
-                    <Input
-                      value={formData[field.key as keyof typeof formData]}
-                      onChangeText={(value) => handleInputChange(field.key, value)}
-                      placeholder={field.placeholder}
-                      keyboardType={field.keyboardType as any}
-                      style={[styles.input, (field as any).disabled && styles.disabledInput]}
-                      editable={!(field as any).disabled}
-                    />
+                  <View key={field.key}>
+                    <View style={styles.fieldContainer}>
+                      <Text style={styles.fieldLabel}>
+                        {field.label}
+                        {field.required === true && <Text style={styles.required}> *</Text>}
+                      </Text>
+                      <Input
+                        value={formData[field.key as keyof typeof formData]}
+                        onChangeText={(value) => handleInputChange(field.key, value)}
+                        placeholder={field.placeholder}
+                        keyboardType={field.keyboardType as any}
+                        style={styles.input}
+                        disabled={field.disabled}
+                      />
+                    </View>
+                    
+                    {/* Show calculated age after date of birth field */}
+                    {field.key === 'dateOfBirth' && formData.dateOfBirth && (
+                      <View style={styles.ageDisplayContainer}>
+                        <Text style={styles.ageLabel}>Age:</Text>
+                        <Text style={styles.ageValue}>{formatAge(formData.dateOfBirth)}</Text>
+                      </View>
+                    )}
                   </View>
                 ))}
               </View>
@@ -317,5 +351,24 @@ const styles = StyleSheet.create({
   disabledInput: {
     backgroundColor: COLORS.veryLightGray,
     color: COLORS.textSecondary,
+  },
+  ageDisplayContainer: {
+    marginTop: 8,
+    padding: 12,
+    backgroundColor: COLORS.lightGray,
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.primary,
+  },
+  ageLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: COLORS.textSecondary,
+    marginBottom: 4,
+  },
+  ageValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.primary,
   },
 });
