@@ -60,9 +60,15 @@ export default function PharmacistProfileScreen() {
     },
   ];
 
-  const handleLogout = () => {
-    logout();
-    router.replace('/(auth)');
+  const handleLogout = async () => {
+    try {
+      await logout();
+      router.replace('/(auth)');
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Even if logout fails, redirect to auth
+      router.replace('/(auth)');
+    }
   };
 
   const handleImageUpload = async () => {
@@ -79,19 +85,14 @@ export default function PharmacistProfileScreen() {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
       });
 
       if (!result.canceled && result.assets[0].uri) {
-        updateUser({ 
-          id: user.id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          role: user.role,
+        await updateUser({ 
           profileImage: result.assets[0].uri 
         });
       }
@@ -121,12 +122,7 @@ export default function PharmacistProfileScreen() {
       });
 
       if (!result.canceled && result.assets[0].uri) {
-        updateUser({ 
-          id: user.id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          role: user.role,
+        await updateUser({ 
           profileImage: result.assets[0].uri 
         });
       }

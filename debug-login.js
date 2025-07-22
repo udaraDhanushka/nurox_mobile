@@ -4,8 +4,7 @@ async function testLogin() {
   const { default: fetch } = await import('node-fetch');
   try {
     console.log('Testing login request...');
-    
-    const response = await fetch('http://10.83.114.223:3000/api/auth/login', {
+   
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

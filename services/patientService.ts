@@ -1,96 +1,6 @@
 import { appointmentService } from './appointmentService';
 import { Patient, DetailedPatient, ApiAppointment } from '../types/appointment';
-import { patientDataService } from './patientDataService';
-import { calculateAge, formatAge } from '../utils/dateUtils';
 
-class PatientService {
-  constructor() {
-    // Patient service now uses real API data only
-  }
-  // Transform appointment patients to patient list with database-synced data
-  private async transformAppointmentPatientsToPatientListWithDatabaseSync(
-    appointments: ApiAppointment[],
-    doctorId: string
-  ): Promise<Patient[]> {
-    const patientMap = new Map<string, Patient>();
-    
-    // Get unique patient IDs from appointments
-    const patientIds = [...new Set(
-      appointments
-        .filter(appointment => appointment.doctorId === doctorId && appointment.patient)
-        .map(appointment => appointment.patient!.id)
-    )];
-
-    // Try to fetch fresh patient data from database for each patient
-    const patientDataPromises = patientIds.map(async (patientId) => {
-      try {
-        const patientData = await patientDataService.getPatientProfile(patientId);
-        return { patientId, patientData };
-      } catch (error) {
-        console.error(`Failed to fetch patient ${patientId}:`, error);
-        return { patientId, patientData: null };
-      }
-    });
-
-    const patientDataResults = await Promise.allSettled(patientDataPromises);
-    const patientDataMap = new Map<string, any>();
-
-    patientDataResults.forEach((result) => {
-      if (result.status === 'fulfilled' && result.value.patientData) {
-        patientDataMap.set(result.value.patientId, result.value.patientData);
-      }
-    });
-
-    // Build patient list using database data and appointment data
-    appointments
-      .filter(appointment => appointment.doctorId === doctorId && appointment.patient)
-      .forEach(appointment => {
-        const apiPatient = appointment.patient!;
-        const patientId = apiPatient.id;
-        
-        if (!patientMap.has(patientId)) {
-          // Use database-fetched data if available, fallback to cached data, then appointment data
-          const databasePatient = patientDataMap.get(patientId);
-          const cachedPatient = databasePatient || patientDataService.getCachedPatientData(patientId);
-          
-          // Calculate real age from database birth date
-          const age = cachedPatient?.age || 
-                     (cachedPatient?.dateOfBirth ? calculateAge(cachedPatient.dateOfBirth) : undefined);
-          
-          const status = this.determinePatientStatus(appointment);
-          const conditions = this.extractConditionsFromAppointment(appointment);
-          
-          patientMap.set(patientId, {
-            id: apiPatient.id,
-            firstName: cachedPatient?.firstName || apiPatient.firstName,
-            lastName: cachedPatient?.lastName || apiPatient.lastName,
-            name: `${cachedPatient?.firstName || apiPatient.firstName} ${cachedPatient?.lastName || apiPatient.lastName}`,
-            email: cachedPatient?.email || apiPatient.email,
-            phone: cachedPatient?.phone || apiPatient.phone,
-            profileImage: cachedPatient?.profileImage || apiPatient.profileImage || 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?q=80&w=987&auto=format&fit=crop',
-            age,
-            dateOfBirth: cachedPatient?.dateOfBirth,
-            lastVisit: appointment.appointmentDate,
-            conditions,
-            status,
-            appointmentCount: 1
-          });
-        } else {
-          // Update existing patient with latest appointment info
-          const existingPatient = patientMap.get(patientId)!;
-          
-          if (new Date(appointment.appointmentDate) > new Date(existingPatient.lastVisit!)) {
-            existingPatient.lastVisit = appointment.appointmentDate;
-          }
-          
-          existingPatient.appointmentCount = (existingPatient.appointmentCount || 0) + 1;
-        }
-      });
-
-    return Array.from(patientMap.values());
-  }
-
-  // Transform appointment patients to patient list for a specific doctor (legacy method)
   private transformAppointmentPatientsToPatientList(
     appointments: ApiAppointment[],
     doctorId: string
@@ -105,8 +15,6 @@ class PatientService {
         const patientId = apiPatient.id;
         
         if (!patientMap.has(patientId)) {
-          // Get age from cached patient data
-          const age = this.getPatientAge(apiPatient.id);
           
           // Determine patient status based on recent appointment activity
           const status = this.determinePatientStatus(appointment);
@@ -154,11 +62,6 @@ class PatientService {
     return Array.from(patientMap.values())
       .sort((a, b) => new Date(b.lastVisit!).getTime() - new Date(a.lastVisit!).getTime());
   }
-
-  // Get age from cached patient data or return undefined
-  private getPatientAge(patientId: string): number | undefined {
-    const cachedPatient = patientDataService.getCachedPatientData(patientId);
-    return cachedPatient?.age;
   }
 
   // Determine patient status based on appointment info
@@ -231,7 +134,6 @@ class PatientService {
         return [];
       }
       
-      return await this.transformAppointmentPatientsToPatientListWithDatabaseSync(response.appointments, doctorId);
     } catch (error) {
       console.error('Failed to get doctor patients:', error);
       return [];
@@ -285,26 +187,11 @@ class PatientService {
         return null;
       }
       
-      // Try to get fresh patient data from database first
-      const realPatientData = await patientDataService.getPatientProfile(patientId);
-      
-      // Get basic patient info from most recent appointment as fallback
       const latestAppointment = patientAppointments
         .sort((a, b) => new Date(b.appointmentDate).getTime() - new Date(a.appointmentDate).getTime())[0];
       
       const apiPatient = latestAppointment.patient!;
       
-      // Build detailed patient object with real data
-      const detailedPatient: DetailedPatient = {
-        id: apiPatient.id,
-        firstName: realPatientData?.firstName || apiPatient.firstName,
-        lastName: realPatientData?.lastName || apiPatient.lastName,
-        name: `${realPatientData?.firstName || apiPatient.firstName} ${realPatientData?.lastName || apiPatient.lastName}`,
-        email: realPatientData?.email || apiPatient.email,
-        phone: realPatientData?.phone || apiPatient.phone,
-        profileImage: realPatientData?.profileImage || apiPatient.profileImage || 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?q=80&w=987&auto=format&fit=crop',
-        dateOfBirth: realPatientData?.dateOfBirth,
-        age: realPatientData?.age || (realPatientData?.dateOfBirth ? calculateAge(realPatientData.dateOfBirth) : undefined),
         gender: this.inferGender(apiPatient.firstName),
         lastVisit: latestAppointment.appointmentDate,
         status: this.determinePatientStatus(latestAppointment),

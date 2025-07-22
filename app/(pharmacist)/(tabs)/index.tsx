@@ -81,7 +81,7 @@ export default function PharmacistDashboardScreen() {
                     </View>
                     <TouchableOpacity
                         style={styles.profileButton}
-                        onPress={() => router.push('/profile')}
+                        onPress={() => router.push('/(pharmacist)/profile')}
                     >
                         {user?.profileImage ? (
                             <Image

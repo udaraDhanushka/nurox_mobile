@@ -1,6 +1,6 @@
 import { Language } from '@/store/languageStore';
 
-export type UserRole = 'patient' | 'doctor' | 'pharmacist';
+export type UserRole = 'patient' | 'doctor' | 'pharmacist' | 'mlt' | 'hospital_admin' | 'pharmacy_admin' | 'lab_admin' | 'insurance_admin' | 'insurance_agent' | 'super_admin';
 
 export interface User {
   id: string;
@@ -10,29 +10,62 @@ export interface User {
   role: UserRole;
   profileImage?: string;
   language?: Language;
-<<<<<<< Updated upstream
-=======
-  phone?: string;
-  dateOfBirth: string;
-  age?: number; // Calculated from dateOfBirth
   isActive: boolean;
   emailVerified: boolean;
   phoneVerified: boolean;
   createdAt: string;
   updatedAt: string;
->>>>>>> Stashed changes
   
-  // Doctor-specific fields
+  // Organization affiliations
+  hospitalId?: string;
+  pharmacyId?: string;
+  laboratoryId?: string;
+  insuranceId?: string;
+  
+  // Organization data
+  hospital?: {
+    id: string;
+    name: string;
+    address: string;
+    specialties: string[];
+    status: string;
+  };
+  pharmacy?: {
+    id: string;
+    name: string;
+    address: string;
+    status: string;
+  };
+  laboratory?: {
+    id: string;
+    name: string;
+    address: string;
+    testTypes: string[];
+    status: string;
+  };
+  insuranceCompany?: {
+    id: string;
+    name: string;
+    address: string;
+    coverageTypes: string[];
+    status: string;
+  };
+  
+  // Role-specific profiles
+  patientProfile?: PatientProfile;
+  doctorProfile?: DoctorProfile;
+  pharmacistProfile?: PharmacistProfile;
+  mltProfile?: MLTProfile;
+  
+  // Legacy fields for backward compatibility
   specialization?: string;
+  specializations?: string[];
   licenseNumber?: string;
   hospitalAffiliation?: string;
-  
-  // Pharmacist-specific fields
+  hospitalAffiliations?: HospitalAffiliation[];
   pharmacyAffiliation?: string;
 }
 
-<<<<<<< Updated upstream
-=======
 export interface PatientProfile {
   id: string;
   emergencyContact?: string;
@@ -43,7 +76,6 @@ export interface PatientProfile {
   occupation?: string;
   address?: string;
   city?: string;
-  state?: string;
   zipCode?: string;
   country?: string;
   insuranceProvider?: string;
@@ -96,10 +128,10 @@ export interface HospitalAffiliation {
   department?: string; // e.g., Cardiology, Emergency
 }
 
->>>>>>> Stashed changes
 export interface AuthState {
   user: User | null;
   token: string | null;
+  refreshToken: string | null;
   isLoading: boolean;
   error: string | null;
 }
@@ -115,10 +147,6 @@ export interface RegisterData {
   firstName: string;
   lastName: string;
   role: UserRole;
-<<<<<<< Updated upstream
-=======
-  phone?: string;
-  dateOfBirth: string;
   
   // Organization selections
   hospitalId?: string;
@@ -130,7 +158,6 @@ export interface RegisterData {
   specialization?: string;
   certifications?: string[];
   specializations?: string[];
->>>>>>> Stashed changes
 }
 
 export interface ResetPasswordData {

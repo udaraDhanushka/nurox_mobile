@@ -6,7 +6,8 @@ import {
     ActivityIndicator,
     ViewStyle,
     TextStyle,
-    View
+    View,
+    StyleProp // ✅ Import StyleProp
 } from 'react-native';
 import { COLORS, SIZES } from '../constants/theme';
 
@@ -17,23 +18,23 @@ interface ButtonProps {
     size?: 'small' | 'medium' | 'large';
     isLoading?: boolean;
     disabled?: boolean;
-    style?: ViewStyle;
-    textStyle?: TextStyle;
+    style?: StyleProp<ViewStyle>;
+    textStyle?: StyleProp<TextStyle>; 
     icon?: React.ReactNode;
 }
 
 export const Button: React.FC<ButtonProps> = ({
-                                                  title,
-                                                  onPress,
-                                                  variant = 'primary',
-                                                  size = 'medium',
-                                                  isLoading = false,
-                                                  disabled = false,
-                                                  style,
-                                                  textStyle,
-                                                  icon
-                                              }) => {
-    const getButtonStyle = () => {
+    title,
+    onPress,
+    variant = 'primary',
+    size = 'medium',
+    isLoading = false,
+    disabled = false,
+    style,
+    textStyle,
+    icon
+}) => {
+    const getButtonStyle = (): ViewStyle => {
         let buttonStyle: ViewStyle = {};
 
         // Variant styles
@@ -103,7 +104,7 @@ export const Button: React.FC<ButtonProps> = ({
         return buttonStyle;
     };
 
-    const getTextStyle = () => {
+    const getTextStyle = (): TextStyle => {
         let style: TextStyle = {
             fontSize: SIZES.md,
             fontWeight: '600',
@@ -146,7 +147,7 @@ export const Button: React.FC<ButtonProps> = ({
 
     return (
         <TouchableOpacity
-            style={[styles.button, getButtonStyle(), style]}
+            style={[styles.button, getButtonStyle(), style]} 
             onPress={onPress}
             disabled={disabled || isLoading}
             activeOpacity={0.8}

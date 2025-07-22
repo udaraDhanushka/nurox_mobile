@@ -31,6 +31,8 @@ export const COLORS = {
 
     // Transparent colors
     transparentPrimary: 'rgba(74, 128, 240, 0.1)',
+    transparentSuccess: 'rgba(76, 175, 80, 0.1)',
+    transparentError: 'rgba(244, 67, 54, 0.1)',
     transparentBlack: 'rgba(0, 0, 0, 0.5)',
 };
 

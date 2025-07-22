@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { User, Phone, Mail, MapPin, Calendar, Save } from 'lucide-react-native';
 import { COLORS, SIZES, SHADOWS } from '@/constants/theme';
 import { useAuthStore } from '@/store/authStore';
+import { authService } from '@/services/authService';
 import { Input } from '@/components/Input';
 import { Button } from '@/components/Button';
 
@@ -17,14 +18,14 @@ export default function PersonalInformationScreen() {
     firstName: user?.firstName || '',
     lastName: user?.lastName || '',
     email: user?.email || '',
-    phone: '',
-    address: '',
-    city: '',
-    state: '',
-    zipCode: '',
-    dateOfBirth: '',
-    emergencyContact: '',
-    emergencyPhone: '',
+    phone: user?.phone || '',
+    address: user?.patientProfile?.address || '',
+    city: user?.patientProfile?.city || '',
+    state: user?.patientProfile?.state || '',
+    zipCode: user?.patientProfile?.zipCode || '',
+    dateOfBirth: user?.dateOfBirth ? new Date(user.dateOfBirth).toLocaleDateString() : '',
+    emergencyContact: user?.patientProfile?.emergencyContact || '',
+    emergencyPhone: user?.patientProfile?.emergencyPhone || '',
   });
 
   const [isLoading, setIsLoading] = useState(false);
@@ -61,13 +62,34 @@ export default function PersonalInformationScreen() {
     setIsLoading(true);
 
     try {
-      // Update user in store
-      updateUser({
-        ...user,
+      // Update user profile (basic info)
+      const userUpdateData: any = {
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
-        email: formData.email.trim(),
-      });
+      };
+
+      // Add optional user fields if they have values
+      if (formData.phone.trim()) userUpdateData.phone = formData.phone.trim();
+      if (formData.dateOfBirth.trim()) userUpdateData.dateOfBirth = formData.dateOfBirth.trim();
+
+      // Update patient profile (address and emergency contact info)
+      const patientUpdateData: any = {};
+      if (formData.address.trim()) patientUpdateData.address = formData.address.trim();
+      if (formData.city.trim()) patientUpdateData.city = formData.city.trim();
+      if (formData.state.trim()) patientUpdateData.state = formData.state.trim();
+      if (formData.zipCode.trim()) patientUpdateData.zipCode = formData.zipCode.trim();
+      if (formData.emergencyContact.trim()) patientUpdateData.emergencyContact = formData.emergencyContact.trim();
+      if (formData.emergencyPhone.trim()) patientUpdateData.emergencyPhone = formData.emergencyPhone.trim();
+
+      // Update both profiles
+      console.log('Updating user profile with:', userUpdateData);
+      await updateUser(userUpdateData);
+      
+      // Only update patient profile if there's data to update
+      if (Object.keys(patientUpdateData).length > 0) {
+        console.log('Updating patient profile with:', patientUpdateData);
+        await authService.updatePatientProfile(patientUpdateData);
+      }
 
       Alert.alert(
         'Success',
@@ -105,11 +127,12 @@ export default function PersonalInformationScreen() {
           required: true,
         },
         {
-          label: 'Email',
+          label: 'Email (Cannot be changed)',
           key: 'email',
           placeholder: 'Enter your email address',
           keyboardType: 'email-address',
           required: true,
+          disabled: true,
         },
         {
           label: 'Phone Number',
@@ -207,7 +230,8 @@ export default function PersonalInformationScreen() {
                       onChangeText={(value) => handleInputChange(field.key, value)}
                       placeholder={field.placeholder}
                       keyboardType={field.keyboardType as any}
-                      style={styles.input}
+                      style={[styles.input, (field as any).disabled && styles.disabledInput]}
+                      editable={!(field as any).disabled}
                     />
                   </View>
                 ))}
@@ -289,5 +313,9 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     backgroundColor: COLORS.primary,
+  },
+  disabledInput: {
+    backgroundColor: COLORS.veryLightGray,
+    color: COLORS.textSecondary,
   },
 });

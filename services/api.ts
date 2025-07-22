@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { API_CONFIG } from '../constants/api';
-import { getDynamicAPIBaseURL } from '../utils/networkUtils';
+
 
 // API Configuration
 const API_BASE_URL = __DEV__ 
@@ -18,32 +18,6 @@ interface ApiResponse<T = any> {
 
 class ApiService {
   private baseURL: string;
-  private dynamicBaseURL: string | null = null;
-
-  constructor() {
-    this.baseURL = API_BASE_URL;
-    this.initializeDynamicURL();
-  }
-
-  private async initializeDynamicURL() {
-    if (__DEV__) {
-      try {
-        this.dynamicBaseURL = await getDynamicAPIBaseURL();
-        console.log(`🔗 API Service initialized with dynamic URL: ${this.dynamicBaseURL}`);
-      } catch (error) {
-        console.error('Failed to get dynamic API URL:', error);
-        this.dynamicBaseURL = this.baseURL;
-      }
-    } else {
-      this.dynamicBaseURL = this.baseURL;
-    }
-  }
-
-  private async getBaseURL(): Promise<string> {
-    if (!this.dynamicBaseURL && __DEV__) {
-      await this.initializeDynamicURL();
-    }
-    return this.dynamicBaseURL || this.baseURL;
   }
 
   // Get stored auth tokens
@@ -110,8 +84,6 @@ class ApiService {
       }
 
       console.log('Attempting to refresh access token...');
-      const baseURL = await this.getBaseURL();
-      const response = await fetch(`${baseURL}/auth/refresh-token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -243,8 +215,6 @@ class ApiService {
       //   }
       // }
 
-      const baseURL = await this.getBaseURL();
-      const url = `${baseURL}${endpoint}`;
       const headers = await this.createHeaders(includeAuth);
 
       const config: RequestInit = {
@@ -436,9 +406,6 @@ class ApiService {
       if (token) {
         headers.Authorization = `Bearer ${token}`;
       }
-
-      const baseURL = await this.getBaseURL();
-      const response = await fetch(`${baseURL}${endpoint}`, {
         method: 'POST',
         headers,
         body: formData,

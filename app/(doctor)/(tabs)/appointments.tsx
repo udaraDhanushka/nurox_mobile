@@ -1,68 +1,101 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Image } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Calendar, Clock, Plus, Filter, User } from 'lucide-react-native';
 import { COLORS, SIZES, SHADOWS } from '../../../constants/theme';
+import { appointmentService } from '../../../services/appointmentService';
+import { useAuthStore } from '../../../store/authStore';
+import { API_CONFIG } from '../../../constants/api';
 
-// Mock appointment data for doctors
-const mockAppointments = [
-  {
-    id: '1',
-    patientName: 'John Doe',
-    patientImage: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?q=80&w=987&auto=format&fit=crop',
-    date: '2023-11-15',
-    time: '09:00 AM',
-    duration: '30 min',
-    type: 'Check-up',
-    status: 'confirmed',
-    notes: 'Regular blood pressure monitoring'
-  },
-  {
-    id: '2',
-    patientName: 'Emily Johnson',
-    patientImage: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?q=80&w=1961&auto=format&fit=crop',
-    date: '2023-11-15',
-    time: '10:30 AM',
-    duration: '45 min',
-    type: 'Follow-up',
-    status: 'confirmed',
-    notes: 'Diabetes management review'
-  },
-  {
-    id: '3',
-    patientName: 'Michael Smith',
-    patientImage: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=1974&auto=format&fit=crop',
-    date: '2023-11-15',
-    time: '01:15 PM',
-    duration: '30 min',
-    type: 'Consultation',
-    status: 'pending',
-    notes: 'Joint pain assessment'
-  },
-  {
-    id: '4',
-    patientName: 'Sarah Wilson',
-    patientImage: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?q=80&w=1974&auto=format&fit=crop',
-    date: '2023-11-16',
-    time: '11:00 AM',
-    duration: '30 min',
-    type: 'Check-up',
-    status: 'confirmed',
-    notes: 'Asthma medication review'
-  }
-];
+interface DoctorAppointment {
+  id: string;
+  patientName: string;
+  patientImage: string;
+  date: string;
+  time: string;
+  duration: string;
+  type: string;
+  status: string;
+  notes: string;
+  patientOrder?: number; // Sequential patient number for the day (1, 2, 3...)
+}
 
 export default function DoctorAppointmentsScreen() {
   const router = useRouter();
-  const [selectedDate, setSelectedDate] = useState('2023-11-15');
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [appointments, setAppointments] = useState<DoctorAppointment[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { user } = useAuthStore();
+  
+  // Generate dates starting from today
+  const generateDates = () => {
+    const dates = [];
+    const today = new Date();
+    
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(today);
+      date.setDate(today.getDate() + i);
+      dates.push(date.toISOString().split('T')[0]);
+    }
+    
+    return dates;
+  };
+  
+  const availableDates = generateDates();
+
+  useEffect(() => {
+    loadAppointments();
+  }, [selectedDate, user]);
+
+  const loadAppointments = async () => {
+    if (!user || !user.id) return;
+    
+    try {
+      setIsLoading(true);
+      
+      // Use the new doctor-specific method that only returns confirmed appointments
+      const appointments = await appointmentService.getDoctorConfirmedAppointments(user.id, selectedDate);
+      
+      if (appointments && appointments.length > 0) {
+        const doctorAppointments = appointments
+          .map((apt, index) => ({
+            id: apt.id,
+            patientName: apt.patient ? `${apt.patient.firstName} ${apt.patient.lastName}` : 'Unknown Patient',
+            patientImage: apt.patient?.profileImage || 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?q=80&w=987&auto=format&fit=crop',
+            date: new Date(apt.appointmentDate).toISOString().split('T')[0],
+            time: new Date(apt.appointmentDate).toLocaleTimeString('en-US', { 
+              hour: 'numeric', 
+              minute: '2-digit', 
+              hour12: true 
+            }),
+            duration: `${apt.duration || 30} min`,
+            type: apt.type.toLowerCase().replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+            status: apt.status.toLowerCase(),
+            notes: apt.notes || '',
+            patientOrder: index + 1 // Sequential patient number for the day
+          }));
+        
+        setAppointments(doctorAppointments);
+      } else {
+        setAppointments([]);
+      }
+    } catch (error) {
+      console.error('Failed to load doctor appointments:', error);
+      setAppointments([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
+    switch (status.toLowerCase()) {
       case 'confirmed':
-        return COLORS.success;
       case 'pending':
-        return COLORS.warning;
+        return COLORS.success;
+      case 'completed':
+        return COLORS.primary;
+      case 'canceled':
       case 'cancelled':
         return COLORS.error;
       default:
@@ -70,7 +103,7 @@ export default function DoctorAppointmentsScreen() {
     }
   };
 
-  const todayAppointments = mockAppointments.filter(apt => apt.date === selectedDate);
+  const todayAppointments = appointments.filter(apt => apt.date === selectedDate);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -80,41 +113,44 @@ export default function DoctorAppointmentsScreen() {
           <TouchableOpacity style={styles.filterButton}>
             <Filter size={20} color={COLORS.primary} />
           </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.addButton}
-            onPress={() => router.push('/(doctor)/appointments/new')}
-          >
-            <Plus size={20} color={COLORS.white} />
-          </TouchableOpacity>
         </View>
       </View>
 
       {/* Date Selector */}
       <View style={styles.dateSelector}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dateScroll}>
-          {['2023-11-13', '2023-11-14', '2023-11-15', '2023-11-16', '2023-11-17'].map((date) => (
-            <TouchableOpacity
-              key={date}
-              style={[
-                styles.dateItem,
-                selectedDate === date && styles.selectedDateItem
-              ]}
-              onPress={() => setSelectedDate(date)}
-            >
-              <Text style={[
-                styles.dateDay,
-                selectedDate === date && styles.selectedDateText
-              ]}>
-                {new Date(date).toLocaleDateString('en-US', { weekday: 'short' })}
-              </Text>
-              <Text style={[
-                styles.dateNumber,
-                selectedDate === date && styles.selectedDateText
-              ]}>
-                {new Date(date).getDate()}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          {availableDates.map((date) => {
+            const dateObj = new Date(date);
+            const today = new Date().toISOString().split('T')[0];
+            const isToday = date === today;
+            
+            return (
+              <TouchableOpacity
+                key={date}
+                style={[
+                  styles.dateItem,
+                  selectedDate === date && styles.selectedDateItem
+                ]}
+                onPress={() => setSelectedDate(date)}
+              >
+                <Text style={[
+                  styles.dateDay,
+                  selectedDate === date && styles.selectedDateText
+                ]}>
+                  {isToday ? 'Today' : dateObj.toLocaleDateString('en-US', { weekday: 'short' })}
+                </Text>
+                <Text style={[
+                  styles.dateNumber,
+                  selectedDate === date && styles.selectedDateText
+                ]}>
+                  {dateObj.getDate()}
+                </Text>
+                {isToday && (
+                  <View style={styles.todayIndicator} />
+                )}
+              </TouchableOpacity>
+            );
+          })}
         </ScrollView>
       </View>
 
@@ -128,22 +164,32 @@ export default function DoctorAppointmentsScreen() {
           })}
         </Text>
 
-        {todayAppointments.length === 0 ? (
-          <View style={styles.emptyState}>
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
+            <Text style={styles.loadingText}>Loading appointments...</Text>
+          </View>
+        ) : todayAppointments.length === 0 ? (
+          <View style={styles.emptyContainer}>
             <Calendar size={48} color={COLORS.textSecondary} />
-            <Text style={styles.emptyTitle}>No appointments today</Text>
-            <Text style={styles.emptyDescription}>Your schedule is clear for this day</Text>
+            <Text style={styles.emptyText}>No appointments for this date</Text>
           </View>
         ) : (
           todayAppointments.map((appointment) => (
             <TouchableOpacity
               key={appointment.id}
               style={styles.appointmentCard}
-              onPress={() => router.push(`/(doctor)/appointments/${appointment.id}`)}
+              onPress={() => router.push({
+                pathname: '/(doctor)/doctor-appointments/[id]',
+                params: { id: appointment.id }
+              })}
             >
               <View style={styles.timeContainer}>
                 <Text style={styles.appointmentTime}>{appointment.time}</Text>
                 <Text style={styles.appointmentDuration}>{appointment.duration}</Text>
+                {appointment.patientOrder && (
+                  <Text style={styles.patientOrder}>Patient #{appointment.patientOrder}</Text>
+                )}
               </View>
 
               <Image source={{ uri: appointment.patientImage }} style={styles.patientImage} />
@@ -245,6 +291,14 @@ const styles = StyleSheet.create({
   selectedDateText: {
     color: COLORS.white,
   },
+  todayIndicator: {
+    position: 'absolute',
+    bottom: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: COLORS.primary,
+  },
   appointmentsList: {
     flex: 1,
     paddingHorizontal: 16,
@@ -277,6 +331,12 @@ const styles = StyleSheet.create({
   appointmentDuration: {
     fontSize: SIZES.xs,
     color: COLORS.textSecondary,
+  },
+  patientOrder: {
+    fontSize: SIZES.xs,
+    color: COLORS.primary,
+    fontWeight: 'bold',
+    marginTop: 2,
   },
   patientImage: {
     width: 50,
@@ -331,6 +391,29 @@ const styles = StyleSheet.create({
   emptyDescription: {
     fontSize: SIZES.md,
     color: COLORS.textSecondary,
+    textAlign: 'center',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    fontSize: SIZES.md,
+    color: COLORS.textSecondary,
+    marginTop: 12,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyText: {
+    fontSize: SIZES.md,
+    color: COLORS.textSecondary,
+    marginTop: 12,
     textAlign: 'center',
   },
 });

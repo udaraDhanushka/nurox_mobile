@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,9 +12,15 @@ import { useTranslation } from '@/hooks/useTranslation';
 export default function PatientHomeScreen() {
     const router = useRouter();
     const { user } = useAuthStore();
-    const { appointments } = useAppointmentStore();
+    const { appointments, loadAppointmentsFromAPI } = useAppointmentStore();
     const { prescriptions, labReports } = useMedicalStore();
     const { t } = useTranslation();
+
+    useEffect(() => {
+        if (user) {
+            loadAppointmentsFromAPI();
+        }
+    }, [user, loadAppointmentsFromAPI]);
 
     const currentDate = new Date().toLocaleDateString('en-US', { 
         weekday: 'long', 
@@ -25,7 +31,7 @@ export default function PatientHomeScreen() {
 
     // Get upcoming appointments (not cancelled)
     const upcomingAppointments = appointments
-        .filter(app => app.status !== 'cancelled')
+        .filter(app => app.status !== 'canceled')
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
         .slice(0, 2);
 
@@ -73,7 +79,7 @@ export default function PatientHomeScreen() {
                 >
                     <TouchableOpacity
                         style={styles.quickActionButton}
-                        onPress={() => router.push('/appointments/new')}
+                        onPress={() => router.push('/patient-appointments/new')}
                     >
                         <View style={[styles.iconContainer, { backgroundColor: COLORS.transparentPrimary }]}>
                             <Calendar size={24} color={COLORS.primary} />
@@ -113,7 +119,7 @@ export default function PatientHomeScreen() {
 
                     <TouchableOpacity
                         style={styles.quickActionButton}
-                        onPress={() => router.push('/(patient)/health-tips')}
+                        onPress={() => router.push('/health-tips')}
                     >
                         <View style={[styles.iconContainer, { backgroundColor: 'rgba(156, 39, 176, 0.1)' }]}>
                             <HandHeart size={24} color="#9C27B0" />
@@ -126,7 +132,7 @@ export default function PatientHomeScreen() {
                 <View style={styles.sectionContainer}>
                     <View style={styles.sectionHeader}>
                         <Text style={styles.sectionTitle}>{t('upcomingAppointments')}</Text>
-                        <TouchableOpacity onPress={() => router.push('/appointments')}>
+                        <TouchableOpacity onPress={() => router.push('/patient-appointments')}>
                             <Text style={styles.seeAllText}>{t('seeAll')}</Text>
                         </TouchableOpacity>
                     </View>
@@ -136,7 +142,7 @@ export default function PatientHomeScreen() {
                             <TouchableOpacity
                                 key={appointment.id}
                                 style={styles.appointmentCard}
-                                onPress={() => router.push(`/appointments/${appointment.id}`)}
+                                onPress={() => router.push(`/patient-appointments/${appointment.id}`)}
                             >
                                 <Image
                                     source={{ uri: appointment.doctorImage }}
@@ -149,7 +155,7 @@ export default function PatientHomeScreen() {
                                         <Calendar size={14} color={COLORS.textSecondary} />
                                         <Text style={styles.appointmentTime}>{appointment.date}</Text>
                                         <Clock size={14} color={COLORS.textSecondary} />
-                                        <Text style={styles.appointmentTime}>{appointment.time}</Text>
+                                        <Text style={styles.appointmentTime}>{appointment.estimatedTime}</Text>
                                     </View>
                                 </View>
                                 <View style={[
@@ -165,7 +171,7 @@ export default function PatientHomeScreen() {
                             <Text style={styles.emptyStateText}>{t('noUpcomingAppointments')}</Text>
                             <TouchableOpacity
                                 style={styles.bookButton}
-                                onPress={() => router.push('/appointments/new')}
+                                onPress={() => router.push('/patient-appointments/new')}
                             >
                                 <Text style={styles.bookButtonText}>{t('bookNow')}</Text>
                             </TouchableOpacity>

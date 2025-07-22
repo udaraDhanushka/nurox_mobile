@@ -1,38 +1,55 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, Dimensions, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { COLORS, SIZES } from '@/constants/theme';
-import { Button } from '@/components/Button';
+import { LinearGradient } from 'expo-linear-gradient';
+import { ArrowLeft } from 'lucide-react-native';
+import { COLORS, SIZES } from '../../constants/theme';
+import { Button } from '../Button';
 
-export default function WelcomeScreen() {
+interface WelcomeScreenProps {
+    onGetStarted: () => void;
+}
+
+const { width, height } = Dimensions.get('window');
+
+export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onGetStarted }) => {
     const router = useRouter();
-    const [currentPage, setCurrentPage] = useState(0);
+    const [currentSlide, setCurrentSlide] = useState(0);
 
-    const onboardingData = [
+    const slides = [
         {
-            title: "Welcome to Nurox",
-            description: "Your comprehensive healthcare platform for patients, doctors, and pharmacists.",
-            image: "https://images.unsplash.com/photo-1576091160550-2173dba999ef?q=80&w=2070&auto=format&fit=crop"
+            title: "Welcome",
+            subtitle: "to Nurox",
+            description: "Here you can learn new and most interesting things for you",
+            image: "https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=600&fit=crop&crop=face"
         },
         {
-            title: "Manage Your Health",
-            description: "Schedule appointments, access medical records, and manage prescriptions all in one place.",
-            image: "https://images.unsplash.com/photo-1505751172876-fa1923c5c528?q=80&w=2070&auto=format&fit=crop"
+            title: "Expert Care",
+            subtitle: "Professional Doctors",
+            description: "Connect with certified healthcare professionals anytime, anywhere",
+            image: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&h=600&fit=crop&crop=face"
         },
         {
-            title: "Connect with Healthcare Providers",
-            description: "Seamless communication between patients, doctors, and pharmacists for better healthcare outcomes.",
-            image: "https://images.unsplash.com/photo-1579684385127-1ef15d508118?q=80&w=2080&auto=format&fit=crop"
+            title: "Easy to",
+            subtitle: "manage your health",
+            description: "Manage your prescriptions, appointments, and medical history in one place",
+            image: "https://images.unsplash.com/photo-1594824804732-ca8db7d1e3d8?w=400&h=600&fit=crop&crop=face"
         }
     ];
 
     const handleNext = () => {
-        if (currentPage < onboardingData.length - 1) {
-            setCurrentPage(currentPage + 1);
+        if (currentSlide < slides.length - 1) {
+            setCurrentSlide(currentSlide + 1);
         } else {
             router.push('/login');
+        }
+    };
+
+    const handlePrevious = () => {
+        if (currentSlide > 0) {
+            setCurrentSlide(currentSlide - 1);
         }
     };
 
@@ -40,137 +57,208 @@ export default function WelcomeScreen() {
         router.push('/login');
     };
 
-    return (
-        <SafeAreaView style={styles.container}>
-            <StatusBar style="dark" />
+    const currentSlideData = slides[currentSlide];
 
-            <View style={styles.skipContainer}>
-                {currentPage < onboardingData.length - 1 && (
+    return (
+        <View style={styles.container}>
+            {/* Purple gradient background */}
+            <LinearGradient
+                colors={['#3b82f6', '#2563eb']}
+                style={styles.topSection}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+            >
+                {/* Header */}
+                <View style={styles.header}>
+                    <TouchableOpacity
+                        style={styles.backButton}
+                        onPress={handlePrevious}
+                        disabled={currentSlide === 0}
+                    >
+                        {currentSlide > 0 && (
+                            <ArrowLeft size={24} color={COLORS.white} />
+                        )}
+                    </TouchableOpacity>
+
                     <TouchableOpacity onPress={handleSkip}>
                         <Text style={styles.skipText}>Skip</Text>
                     </TouchableOpacity>
-                )}
-            </View>
+                </View>
 
-            <View style={styles.imageContainer}>
-                <Image
-                    source={{ uri: onboardingData[currentPage].image }}
-                    style={styles.image}
-                    resizeMode="cover"
-                />
-            </View>
+                {/* Image Container */}
+                <View style={styles.imageContainer}>
+                    <View style={styles.imageWrapper}>
+                        <Image
+                            source={{ uri: currentSlideData.image }}
+                            style={styles.image}
+                            resizeMode="cover"
+                        />
+                    </View>
+                </View>
+            </LinearGradient>
 
-            <View style={styles.contentContainer}>
-                <Text style={styles.title}>{onboardingData[currentPage].title}</Text>
-                <Text style={styles.description}>{onboardingData[currentPage].description}</Text>
-
-                <View style={styles.paginationContainer}>
-                    {onboardingData.map((_, index) => (
+            {/* White bottom section */}
+            <View style={styles.bottomSection}>
+                {/* Page Indicators */}
+                <View style={styles.indicatorContainer}>
+                    {slides.map((_, index) => (
                         <View
                             key={index}
                             style={[
-                                styles.paginationDot,
-                                index === currentPage && styles.paginationDotActive
+                                styles.indicator,
+                                index === currentSlide ? styles.activeIndicator : styles.inactiveIndicator
                             ]}
                         />
                     ))}
                 </View>
 
-                <Button
-                    title={currentPage === onboardingData.length - 1 ? "Get Started" : "Next"}
-                    onPress={handleNext}
-                    style={styles.button}
-                />
+                {/* Text Content */}
+                <View style={styles.textContent}>
+                    <Text style={styles.title}>{currentSlideData.title}</Text>
+                    <Text style={styles.subtitle}>{currentSlideData.subtitle}</Text>
+                    <Text style={styles.description}>{currentSlideData.description}</Text>
+                </View>
 
-                {currentPage === onboardingData.length - 1 && (
-                    <View style={styles.loginContainer}>
-                        <Text style={styles.loginText}>Already have an account?</Text>
-                        <TouchableOpacity onPress={() => router.push('/login')}>
-                            <Text style={styles.loginLink}>Log In</Text>
-                        </TouchableOpacity>
-                    </View>
-                )}
+                {/* Get Started Button */}
+                <View style={styles.buttonContainer}>
+                    <Button
+                        title={currentSlide === slides.length - 1 ? "Get Started" : "Next"}
+                        onPress={handleNext}
+                        style={styles.getStartedButton}
+                        textStyle={styles.getStartedButtonText}
+                    />
+                </View>
             </View>
-        </SafeAreaView>
+        </View>
     );
-}
+};
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: COLORS.white,
     },
-    skipContainer: {
-        position: 'absolute',
-        top: 16,
-        right: 16,
-        zIndex: 10,
+    topSection: {
+        flex: 2,
+    },
+    bottomSection: {
+        flex: 1,
+        backgroundColor: COLORS.white,
+        borderTopLeftRadius: 40,
+        borderTopRightRadius: 40,
+        padding: 30,
+        paddingBottom: 40,
+        justifyContent: 'space-between',
+        marginTop: -40,
+        zIndex: 2,
+    },
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingTop: 50,
+        paddingBottom: 20,
+    },
+    backButton: {
+        width: 40,
+        height: 40,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     skipText: {
         fontSize: SIZES.md,
-        color: COLORS.primary,
+        color: COLORS.white,
         fontWeight: '500',
     },
     imageContainer: {
-        height: '50%',
-        width: '100%',
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 40,
+        paddingBottom: 40,
+    },
+    imageWrapper: {
+        width: width * 0.5,
+        height: width * 0.7,
+        borderRadius: 20,
         overflow: 'hidden',
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 10,
+        },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 10,
     },
     image: {
         width: '100%',
         height: '100%',
     },
-    contentContainer: {
-        flex: 1,
-        padding: 24,
-        justifyContent: 'center',
-    },
-    title: {
-        fontSize: SIZES.xxxl,
-        fontWeight: 'bold',
-        color: COLORS.textPrimary,
-        marginBottom: 12,
-        textAlign: 'center',
-    },
-    description: {
-        fontSize: SIZES.md,
-        color: COLORS.textSecondary,
-        textAlign: 'center',
-        marginBottom: 32,
-        lineHeight: 22,
-    },
-    paginationContainer: {
+    indicatorContainer: {
         flexDirection: 'row',
         justifyContent: 'center',
-        marginBottom: 32,
+        alignItems: 'center',
+        marginBottom: 20,
+        gap: 8,
     },
-    paginationDot: {
+    indicator: {
         width: 8,
         height: 8,
         borderRadius: 4,
-        backgroundColor: COLORS.lightGray,
-        marginHorizontal: 4,
     },
-    paginationDotActive: {
-        backgroundColor: COLORS.primary,
-        width: 20,
+    activeIndicator: {
+        backgroundColor: '#2563eb',
+        width: 24,
     },
-    button: {
-        width: '100%',
+    inactiveIndicator: {
+        backgroundColor: '#e5e7eb',
     },
-    loginContainer: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        marginTop: 16,
+    textContent: {
+        alignItems: 'center',
+        marginBottom: 20,
     },
-    loginText: {
+    title: {
+        fontSize: 28,
+        fontWeight: 'bold',
+        color: COLORS.textPrimary,
+        textAlign: 'center',
+        marginBottom: 4,
+    },
+    subtitle: {
+        fontSize: 28,
+        fontWeight: 'bold',
+        color: COLORS.textPrimary,
+        textAlign: 'center',
+        marginBottom: 12,
+    },
+    description: {
         fontSize: SIZES.sm,
         color: COLORS.textSecondary,
+        textAlign: 'center',
+        lineHeight: 20,
+        paddingHorizontal: 10,
     },
-    loginLink: {
-        fontSize: SIZES.sm,
-        color: COLORS.primary,
+    buttonContainer: {
+        paddingHorizontal: 0,
+    },
+    getStartedButton: {
+        backgroundColor: '#2563eb',
+        paddingVertical: 16,
+        borderRadius: 12,
+        shadowColor: '#7c3aed',
+        shadowOffset: {
+            width: 0,
+            height: 4,
+        },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 8,
+    },
+    getStartedButtonText: {
+        fontSize: SIZES.md,
         fontWeight: '600',
-        marginLeft: 4,
+        color: COLORS.white,
     },
 });

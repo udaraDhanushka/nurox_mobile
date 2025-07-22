@@ -6,7 +6,7 @@ import { ArrowLeft, TestTube, Calendar, User } from 'lucide-react-native';
 import { COLORS, SIZES, SHADOWS } from '@/constants/theme';
 import { useMedicalStore, LabReportStatus, LabReport } from '@/store/medicalStore';
 
-export default function LabReportsScreen() {
+export default function LabReportsScreen({params}: {params: {is: string}}) {
     const router = useRouter();
     const { labReports } = useMedicalStore();
     const [filter, setFilter] = useState<LabReportStatus | 'all'>('all');
@@ -23,7 +23,10 @@ export default function LabReportsScreen() {
     const renderReportItem = ({ item }: { item: LabReport }) => (
         <TouchableOpacity
             style={styles.reportCard}
-            onPress={() => router.push(`/records/lab-reports/${item.id}`)}
+            onPress={() => router.push({
+                pathname: "/records/lab-reports/[id]",
+                params: { id: item.id }
+            })}
         >
             <View style={styles.reportHeader}>
                 <View style={styles.reportInfo}>

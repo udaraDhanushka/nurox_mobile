@@ -42,56 +42,56 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
   };
 
   return (
-    <Modal
-      animationType="slide"
-      transparent={true}
+      <Modal
+        animationType="slide"
+        transparent={true}
       visible={isVisible}
       onRequestClose={onClose}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={[styles.modalContent, isDarkMode && styles.modalContentDark]}>
-          <Text style={[styles.modalTitle, isDarkMode && styles.textDark]}>
-            {t('selectLanguage')}
-          </Text>
-          
-          <FlatList
-            data={languages}
-            keyExtractor={(item) => item.code}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={[
-                  styles.languageOption,
-                  isDarkMode && styles.languageOptionDark,
-                  item.code === language && styles.selectedOption,
-                  item.code === language && isDarkMode && styles.selectedOptionDark
-                ]}
-                onPress={() => handleLanguageSelect(item.code)}
-              >
-                <View style={styles.languageOptionContent}>
-                  <Text style={[styles.languageName, isDarkMode && styles.textDark]}>
-                    {item.name}
-                  </Text>
-                  <Text style={[styles.nativeName, isDarkMode && styles.textSecondaryDark]}>
-                    {item.nativeName}
-                  </Text>
-                </View>
-                {item.code === language && (
-                  <Check size={20} color={COLORS.primary} />
-                )}
-              </TouchableOpacity>
-            )}
-            style={styles.languageList}
-          />
-          
-          <TouchableOpacity
-            style={[styles.cancelButton, isDarkMode && styles.cancelButtonDark]}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, isDarkMode && styles.modalContentDark]}>
+            <Text style={[styles.modalTitle, isDarkMode && styles.textDark]}>
+              {t('selectLanguage')}
+            </Text>
+            
+            <FlatList
+              data={languages}
+              keyExtractor={(item) => item.code}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.languageOption,
+                    isDarkMode && styles.languageOptionDark,
+                    item.code === language && styles.selectedOption,
+                    item.code === language && isDarkMode && styles.selectedOptionDark
+                  ]}
+                  onPress={() => handleLanguageSelect(item.code)}
+                >
+                  <View style={styles.languageOptionContent}>
+                    <Text style={[styles.languageName, isDarkMode && styles.textDark]}>
+                      {item.name}
+                    </Text>
+                    <Text style={[styles.nativeName, isDarkMode && styles.textSecondaryDark]}>
+                      {item.nativeName}
+                    </Text>
+                  </View>
+                  {item.code === language && (
+                    <Check size={20} color={COLORS.primary} />
+                  )}
+                </TouchableOpacity>
+              )}
+              style={styles.languageList}
+            />
+            
+            <TouchableOpacity
+              style={[styles.cancelButton, isDarkMode && styles.cancelButtonDark]}
             onPress={onClose}
-          >
-            <Text style={styles.cancelButtonText}>{t('cancel')}</Text>
-          </TouchableOpacity>
+            >
+              <Text style={styles.cancelButtonText}>{t('cancel')}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
-    </Modal>
+      </Modal>
   );
 };
 

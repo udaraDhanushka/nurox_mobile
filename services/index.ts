@@ -5,8 +5,6 @@ export { appointmentService } from './appointmentService';
 export { prescriptionService } from './prescriptionService';
 export { notificationService } from './notificationService';
 export { socketService } from './socketService';
-export { medicineService } from './medicineService';
-export { testService } from './testService';
 
 // You can add more services here as you create them:
 // export { labResultService } from './labResultService';
