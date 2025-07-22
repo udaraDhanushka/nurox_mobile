@@ -1,92 +1,116 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Image, TextInput } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Image, TextInput, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Search, Filter, Plus, FileText, Calendar, User } from 'lucide-react-native';
 import { COLORS, SIZES, SHADOWS } from '../../../constants/theme';
+import { prescriptionService } from '../../../services/prescriptionService';
+import { useAuthStore } from '../../../store/authStore';
 
-// Mock prescription data for doctors
-const mockPrescriptions = [
-  {
-    id: '1',
-    patientName: 'John Doe',
-    patientImage: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?q=80&w=987&auto=format&fit=crop',
-    medication: 'Lisinopril 10mg',
-    dosage: 'Once daily',
-    quantity: '30 tablets',
-    refills: 2,
-    dateIssued: '2023-11-10',
-    status: 'active',
-    condition: 'Hypertension'
-  },
-  {
-    id: '2',
-    patientName: 'Emily Johnson',
-    patientImage: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?q=80&w=1961&auto=format&fit=crop',
-    medication: 'Metformin 500mg',
-    dosage: 'Twice daily',
-    quantity: '60 tablets',
-    refills: 3,
-    dateIssued: '2023-11-08',
-    status: 'active',
-    condition: 'Diabetes Type 2'
-  },
-  {
-    id: '3',
-    patientName: 'Michael Smith',
-    patientImage: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=1974&auto=format&fit=crop',
-    medication: 'Ibuprofen 400mg',
-    dosage: 'As needed',
-    quantity: '20 tablets',
-    refills: 1,
-    dateIssued: '2023-11-05',
-    status: 'completed',
-    condition: 'Arthritis'
-  },
-  {
-    id: '4',
-    patientName: 'Sarah Wilson',
-    patientImage: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?q=80&w=1974&auto=format&fit=crop',
-    medication: 'Albuterol Inhaler',
-    dosage: '2 puffs as needed',
-    quantity: '1 inhaler',
-    refills: 2,
-    dateIssued: '2023-11-12',
-    status: 'active',
-    condition: 'Asthma'
-  }
-];
+// Type for prescription items from the API
+interface PrescriptionItem {
+  medicine?: {
+    name?: string;
+  };
+  name?: string;
+  dosage?: string;
+  frequency?: string;
+  duration?: string;
+}
+
+// Type for prescription from the API
+interface Prescription {
+  id: string;
+  patientName?: string;
+  diagnosis?: string;
+  items?: PrescriptionItem[];
+  medications?: Array<{ name: string }>;
+  condition?: string;
+  date: string;
+  status: string;
+  patient?: {
+    firstName?: string;
+    lastName?: string;
+    profileImage?: string;
+  };
+}
 
 export default function DoctorPrescriptionsScreen() {
   const router = useRouter();
+  const { user } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState('');
-  const [filteredPrescriptions, setFilteredPrescriptions] = useState(mockPrescriptions);
+  const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
+  const [filteredPrescriptions, setFilteredPrescriptions] = useState<Prescription[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadPrescriptions();
+  }, [user?.id]);
+
+  const loadPrescriptions = async () => {
+    if (!user?.id) return;
+    
+    try {
+      setIsLoading(true);
+      setError(null);
+      const response = await prescriptionService.getPrescriptions({
+        doctorId: user.id,
+        limit: 50
+      });
+      setPrescriptions(response.prescriptions);
+      setFilteredPrescriptions(response.prescriptions);
+    } catch (error) {
+      console.error('Failed to load prescriptions:', error);
+      setError('Failed to load prescriptions');
+      setPrescriptions([]);
+      setFilteredPrescriptions([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
     if (query.trim() === '') {
-      setFilteredPrescriptions(mockPrescriptions);
+      setFilteredPrescriptions(prescriptions);
     } else {
-      const filtered = mockPrescriptions.filter(prescription =>
-        prescription.patientName.toLowerCase().includes(query.toLowerCase()) ||
-        prescription.medication.toLowerCase().includes(query.toLowerCase()) ||
-        prescription.condition.toLowerCase().includes(query.toLowerCase())
+      const filtered = prescriptions.filter(prescription =>
+        (prescription.patientName && prescription.patientName.toLowerCase().includes(query.toLowerCase())) ||
+        (prescription.items && prescription.items.some(item => 
+          item.medicine?.name?.toLowerCase().includes(query.toLowerCase())
+        )) ||
+        (prescription.diagnosis && prescription.diagnosis.toLowerCase().includes(query.toLowerCase()))
       );
       setFilteredPrescriptions(filtered);
     }
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active':
+    switch (status?.toLowerCase()) {
+      case 'pending':
+        return COLORS.warning;
+      case 'processing':
+        return COLORS.primary;
+      case 'ready':
         return COLORS.success;
-      case 'completed':
+      case 'dispensed':
         return COLORS.textSecondary;
-      case 'expired':
+      case 'cancelled':
         return COLORS.error;
       default:
         return COLORS.textSecondary;
     }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString();
+  };
+
+  const getPrimaryMedicine = (items: PrescriptionItem[] | undefined) => {
+    if (!items || items.length === 0) return 'No medication';
+    const firstItem = items[0];
+    return firstItem.medicine?.name || firstItem.name || 'Unknown medication';
   };
 
   return (
@@ -120,64 +144,116 @@ export default function DoctorPrescriptionsScreen() {
 
       {/* Prescriptions List */}
       <ScrollView style={styles.prescriptionsList} showsVerticalScrollIndicator={false}>
-        {filteredPrescriptions.map((prescription) => (
-          <TouchableOpacity
-            key={prescription.id}
-            style={styles.prescriptionCard}
-            onPress={() => router.push({
-              pathname: '/(doctor)/doctor-prescriptions/[id]',
-              params: {id: prescription.id}
-            })}
-          >
-            <View style={styles.prescriptionHeader}>
-              <Image source={{ uri: prescription.patientImage }} style={styles.patientImage} />
-              <View style={styles.prescriptionInfo}>
-                <Text style={styles.patientName}>{prescription.patientName}</Text>
-                <Text style={styles.condition}>{prescription.condition}</Text>
-              </View>
-              <View style={[
-                styles.statusBadge,
-                { backgroundColor: getStatusColor(prescription.status) + '20' }
-              ]}>
-                <Text style={[
-                  styles.statusText,
-                  { color: getStatusColor(prescription.status) }
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
+            <Text style={styles.loadingText}>Loading prescriptions...</Text>
+          </View>
+        ) : error ? (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={loadPrescriptions}>
+              <Text style={styles.retryText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : filteredPrescriptions.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <FileText size={48} color={COLORS.textSecondary} />
+            <Text style={styles.emptyTitle}>No prescriptions found</Text>
+            <Text style={styles.emptyDescription}>
+              {searchQuery ? 'Try adjusting your search criteria' : 'Prescriptions you create will appear here'}
+            </Text>
+          </View>
+        ) : (
+          filteredPrescriptions.map((prescription) => (
+            <TouchableOpacity
+              key={prescription.id}
+              style={styles.prescriptionCard}
+              onPress={() => router.push({
+                pathname: '/(doctor)/doctor-prescriptions/[id]',
+                params: {id: prescription.id}
+              })}
+            >
+              <View style={styles.prescriptionHeader}>
+                <Image 
+                  source={{ 
+                    uri: prescription.patient?.profileImage || 
+                    'https://images.unsplash.com/photo-1599566150163-29194dcaad36?q=80&w=987&auto=format&fit=crop' 
+                  }} 
+                  style={styles.patientImage} 
+                />
+                <View style={styles.prescriptionInfo}>
+                  <Text style={styles.patientName}>
+                    {prescription.patient ? 
+                      `${prescription.patient.firstName} ${prescription.patient.lastName}` : 
+                      prescription.patientName || 'Unknown Patient'
+                    }
+                  </Text>
+                  <Text style={styles.condition}>
+                    {prescription.diagnosis || 'No diagnosis specified'}
+                  </Text>
+                </View>
+                <View style={[
+                  styles.statusBadge,
+                  { backgroundColor: getStatusColor(prescription.status) + '20' }
                 ]}>
-                  {prescription.status}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.medicationInfo}>
-              <View style={styles.medicationHeader}>
-                <FileText size={20} color={COLORS.primary} />
-                <Text style={styles.medicationName}>{prescription.medication}</Text>
-              </View>
-              
-              <View style={styles.prescriptionDetails}>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Dosage:</Text>
-                  <Text style={styles.detailValue}>{prescription.dosage}</Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Quantity:</Text>
-                  <Text style={styles.detailValue}>{prescription.quantity}</Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Refills:</Text>
-                  <Text style={styles.detailValue}>{prescription.refills} remaining</Text>
+                  <Text style={[
+                    styles.statusText,
+                    { color: getStatusColor(prescription.status) }
+                  ]}>
+                    {prescription.status || 'pending'}
+                  </Text>
                 </View>
               </View>
 
-              <View style={styles.prescriptionFooter}>
-                <View style={styles.dateContainer}>
-                  <Calendar size={14} color={COLORS.textSecondary} />
-                  <Text style={styles.dateText}>Issued: {prescription.dateIssued}</Text>
+              <View style={styles.medicationInfo}>
+                <View style={styles.medicationHeader}>
+                  <FileText size={20} color={COLORS.primary} />
+                  <Text style={styles.medicationName}>
+                    {getPrimaryMedicine(prescription.items)}
+                    {prescription.items && prescription.items.length > 1 && 
+                      ` +${prescription.items.length - 1} more`
+                    }
+                  </Text>
+                </View>
+                
+                <View style={styles.prescriptionDetails}>
+                  {prescription.items && prescription.items[0] && (
+                    <>
+                      <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>Dosage:</Text>
+                        <Text style={styles.detailValue}>
+                          {prescription.items[0].dosage || 'Not specified'}
+                        </Text>
+                      </View>
+                      <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>Frequency:</Text>
+                        <Text style={styles.detailValue}>
+                          {prescription.items[0].frequency || 'Not specified'}
+                        </Text>
+                      </View>
+                      <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>Duration:</Text>
+                        <Text style={styles.detailValue}>
+                          {prescription.items[0].duration || 'Not specified'}
+                        </Text>
+                      </View>
+                    </>
+                  )}
+                </View>
+
+                <View style={styles.prescriptionFooter}>
+                  <View style={styles.dateContainer}>
+                    <Calendar size={14} color={COLORS.textSecondary} />
+                    <Text style={styles.dateText}>
+                      Created: {prescription.createdAt ? formatDate(prescription.createdAt) : 'Unknown'}
+                    </Text>
+                  </View>
                 </View>
               </View>
-            </View>
-          </TouchableOpacity>
-        ))}
+            </TouchableOpacity>
+          ))
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -331,5 +407,60 @@ const styles = StyleSheet.create({
   dateText: {
     fontSize: SIZES.xs,
     color: COLORS.textSecondary,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 48,
+  },
+  loadingText: {
+    fontSize: SIZES.md,
+    color: COLORS.textSecondary,
+    marginTop: 12,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 48,
+    paddingHorizontal: 32,
+  },
+  errorText: {
+    fontSize: SIZES.md,
+    color: COLORS.error,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  retryButton: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  retryText: {
+    fontSize: SIZES.sm,
+    color: COLORS.white,
+    fontWeight: '600',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 48,
+    paddingHorizontal: 32,
+  },
+  emptyTitle: {
+    fontSize: SIZES.lg,
+    fontWeight: 'bold',
+    color: COLORS.textPrimary,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyDescription: {
+    fontSize: SIZES.md,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });

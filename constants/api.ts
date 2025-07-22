@@ -1,7 +1,7 @@
 // API Configuration Constants
 export const API_CONFIG = {
   // Base URLs
-  DEV_BASE_URL: 'http://192.168.0.102:3000/api',
+  DEV_BASE_URL: 'http://10.83.114.223:3000/api',
   PROD_BASE_URL: 'https://your-production-api.com/api',
   
   // Feature flags for data sources
@@ -9,12 +9,12 @@ export const API_CONFIG = {
   FORCE_REAL_DATA: true, // Always use real API data
   
   // Socket URLs
-  DEV_SOCKET_URL: 'http://192.168.0.102:3000',
+  DEV_SOCKET_URL: 'http://10.83.114.223:3000',
   PROD_SOCKET_URL: 'https://your-production-api.com',
   
   // Request timeouts (in milliseconds)
-  TIMEOUT: 30000,
-  UPLOAD_TIMEOUT: 60000,
+  TIMEOUT: 45000, // Increased for mobile development
+  UPLOAD_TIMEOUT: 90000,
   
   // File upload limits
   MAX_FILE_SIZE: 10 * 1024 * 1024, // 10MB

@@ -8,6 +8,9 @@ import { Button } from '../../../components/Button';
 import { patientService } from '../../../services/patientService';
 import { useAuthStore } from '../../../store/authStore';
 import { DetailedPatient } from '../../../types/appointment';
+import { calculateAge, formatAge } from '../../../utils/dateUtils';
+import { usePatientDataSync } from '../../../hooks/usePatientDataSync';
+import { useSpecificPatientSync } from '../../../hooks/usePatientSyncListener';
 
 // Mock data removed - now using real patient data from API via patientService
 
@@ -18,6 +21,20 @@ export default function DoctorPatientDetailScreen() {
   const [patient, setPatient] = useState<DetailedPatient | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Use patient data sync for real-time updates
+  const { 
+    patientData: syncedPatientData, 
+    refreshPatientData,
+    isDataStale 
+  } = usePatientDataSync(patientId);
+
+  // Listen for specific patient updates across apps
+  const {
+    patientData: crossAppPatientData,
+    lastUpdate,
+    isDataFresh
+  } = useSpecificPatientSync(patientId);
   
   const patientId = Array.isArray(id) ? id[0] : id;
   
@@ -36,7 +53,30 @@ export default function DoctorPatientDetailScreen() {
       
       const patientDetails = await patientService.getPatientById(patientId, user.id);
       if (patientDetails) {
-        setPatient(patientDetails);
+        // Merge with cross-app synced data for most up-to-date info
+        const bestPatientData = crossAppPatientData || syncedPatientData;
+        const mergedPatient = bestPatientData ? {
+          ...patientDetails,
+          firstName: bestPatientData.firstName || patientDetails.firstName,
+          lastName: bestPatientData.lastName || patientDetails.lastName,
+          name: `${bestPatientData.firstName || patientDetails.firstName} ${bestPatientData.lastName || patientDetails.lastName}`,
+          email: bestPatientData.email || patientDetails.email,
+          phone: bestPatientData.phone || patientDetails.phone,
+          dateOfBirth: bestPatientData.dateOfBirth || patientDetails.dateOfBirth,
+          age: bestPatientData.age || (bestPatientData.dateOfBirth ? calculateAge(bestPatientData.dateOfBirth) : patientDetails.age),
+          profileImage: bestPatientData.profileImage || patientDetails.profileImage
+        } : patientDetails;
+        
+        setPatient(mergedPatient);
+        
+        // Log the data source for debugging
+        console.log('Patient data source:', {
+          fromCrossApp: !!crossAppPatientData,
+          fromSync: !!syncedPatientData,
+          isDataFresh,
+          lastUpdate,
+          patientAge: mergedPatient.age
+        });
       } else {
         setError('Patient not found or not associated with your appointments');
       }
@@ -125,7 +165,7 @@ export default function DoctorPatientDetailScreen() {
           <View style={styles.patientInfo}>
             <Text style={styles.patientName}>{patient.name}</Text>
             <Text style={styles.patientDetails}>
-              {patient.age ? `${patient.age} years old` : 'Age unknown'}
+              {patient.dateOfBirth ? formatAge(patient.dateOfBirth) : 'Age unknown'}
               {patient.gender && ` • ${patient.gender}`}
             </Text>
             {patient.phone && <Text style={styles.patientContact}>{patient.phone}</Text>}
@@ -176,11 +216,18 @@ export default function DoctorPatientDetailScreen() {
           <Text style={styles.sectionTitle}>Basic Information</Text>
           <View style={styles.infoCard}>
             {patient.dateOfBirth && (
-              <View style={styles.infoRow}>
-                <User size={16} color={COLORS.textSecondary} />
-                <Text style={styles.infoLabel}>Date of Birth</Text>
-                <Text style={styles.infoValue}>{new Date(patient.dateOfBirth).toLocaleDateString()}</Text>
-              </View>
+              <>
+                <View style={styles.infoRow}>
+                  <User size={16} color={COLORS.textSecondary} />
+                  <Text style={styles.infoLabel}>Date of Birth</Text>
+                  <Text style={styles.infoValue}>{new Date(patient.dateOfBirth).toLocaleDateString()}</Text>
+                </View>
+                <View style={styles.infoRow}>
+                  <Clock size={16} color={COLORS.textSecondary} />
+                  <Text style={styles.infoLabel}>Age</Text>
+                  <Text style={styles.infoValue}>{formatAge(patient.dateOfBirth)}</Text>
+                </View>
+              </>
             )}
             {patient.bloodType && (
               <View style={styles.infoRow}>

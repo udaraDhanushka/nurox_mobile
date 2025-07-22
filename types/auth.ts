@@ -11,7 +11,8 @@ export interface User {
   profileImage?: string;
   language?: Language;
   phone?: string;
-  dateOfBirth?: string;
+  dateOfBirth: string;
+  age?: number; // Calculated from dateOfBirth
   isActive: boolean;
   emailVerified: boolean;
   phoneVerified: boolean;
@@ -78,6 +79,7 @@ export interface PatientProfile {
   occupation?: string;
   address?: string;
   city?: string;
+  state?: string;
   zipCode?: string;
   country?: string;
   insuranceProvider?: string;
@@ -150,7 +152,7 @@ export interface RegisterData {
   lastName: string;
   role: UserRole;
   phone?: string;
-  dateOfBirth?: string;
+  dateOfBirth: string;
   
   // Organization selections
   hospitalId?: string;
