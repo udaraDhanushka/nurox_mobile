@@ -8,6 +8,7 @@ import { Input } from '../../components/Input';
 import { Button } from '../../components/Button';
 import { useAuthStore } from '../../store/authStore';
 import { UserRole } from '../../types/auth';
+import { validateDateOfBirth } from '../../utils/dateUtils';
 
 export default function RegisterScreen() {
     const router = useRouter();
@@ -18,6 +19,7 @@ export default function RegisterScreen() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
+    const [dateOfBirth, setDateOfBirth] = useState('');
     const [role, setRole] = useState<UserRole>('patient');
 
     const [firstNameError, setFirstNameError] = useState('');
@@ -25,6 +27,7 @@ export default function RegisterScreen() {
     const [emailError, setEmailError] = useState('');
     const [passwordError, setPasswordError] = useState('');
     const [confirmPasswordError, setConfirmPasswordError] = useState('');
+    const [dateOfBirthError, setDateOfBirthError] = useState('');
 
     // Clear auth store errors when component mounts or unmounts
     useEffect(() => {
@@ -34,7 +37,7 @@ export default function RegisterScreen() {
 
     // Auto-dismiss error messages after 5 seconds
     useEffect(() => {
-        if (error || firstNameError || lastNameError || emailError || passwordError || confirmPasswordError) {
+        if (error || firstNameError || lastNameError || emailError || passwordError || confirmPasswordError || dateOfBirthError) {
             const timer = setTimeout(() => {
                 clearError();
                 setFirstNameError('');
@@ -42,11 +45,12 @@ export default function RegisterScreen() {
                 setEmailError('');
                 setPasswordError('');
                 setConfirmPasswordError('');
+                setDateOfBirthError('');
             }, 5000);
 
             return () => clearTimeout(timer);
         }
-    }, [error, firstNameError, lastNameError, emailError, passwordError, confirmPasswordError]);
+    }, [error, firstNameError, lastNameError, emailError, passwordError, confirmPasswordError, dateOfBirthError]);
 
     const resetForm = () => {
         setFirstName('');
@@ -54,12 +58,14 @@ export default function RegisterScreen() {
         setEmail('');
         setPassword('');
         setConfirmPassword('');
+        setDateOfBirth('');
         setRole('patient');
         setFirstNameError('');
         setLastNameError('');
         setEmailError('');
         setPasswordError('');
         setConfirmPasswordError('');
+        setDateOfBirthError('');
     };
 
     const validateForm = () => {
@@ -114,6 +120,15 @@ export default function RegisterScreen() {
             setConfirmPasswordError('');
         }
 
+        // Date of birth validation
+        const dobValidation = validateDateOfBirth(dateOfBirth);
+        if (!dobValidation.isValid) {
+            setDateOfBirthError(dobValidation.error || 'Invalid date of birth');
+            isValid = false;
+        } else {
+            setDateOfBirthError('');
+        }
+
         return isValid;
     };
 
@@ -126,6 +141,7 @@ export default function RegisterScreen() {
                     lastName,
                     email,
                     password,
+                    dateOfBirth,
                     role
                 });
 
@@ -193,6 +209,14 @@ export default function RegisterScreen() {
                             keyboardType="email-address"
                             autoCapitalize="none"
                             error={emailError}
+                        />
+
+                        <Input
+                            label="Date of Birth *"
+                            value={dateOfBirth}
+                            onChangeText={setDateOfBirth}
+                            placeholder="YYYY-MM-DD"
+                            error={dateOfBirthError}
                         />
 
                         <Input

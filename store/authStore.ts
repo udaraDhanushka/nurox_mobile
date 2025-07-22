@@ -45,12 +45,11 @@ export const useAuthStore = create<AuthStore>()(
             user: authResponse.user ? { id: authResponse.user.id, role: authResponse.user.role } : null,
             hasToken: !!authResponse.accessToken
           });
-          set({ 
-            user: authResponse.user, 
             token: authResponse.accessToken, 
             refreshToken: authResponse.refreshToken,
             isLoading: false 
           });
+        
           console.log('Auth Store: State updated successfully');
         } catch (error) {
           console.error('Auth Store: Login error:', error);
@@ -92,13 +91,14 @@ export const useAuthStore = create<AuthStore>()(
         set({ isLoading: true, error: null });
         try {
           const authResponse = await authService.register(data);
-          set({ 
-            user: authResponse.user, 
+
             token: authResponse.accessToken, 
             refreshToken: authResponse.refreshToken,
             isLoading: false 
           });
+
           return Promise.resolve();
+        
         } catch (error) {
           set({ 
             isLoading: false, 
@@ -160,7 +160,7 @@ export const useAuthStore = create<AuthStore>()(
       updateUser: async (updatedUser) => {
         try {
           const updated = await authService.updateProfile(updatedUser);
-          set({ user: updated });
+          
         } catch (error) {
           console.error('Update user error:', error);
           throw error;

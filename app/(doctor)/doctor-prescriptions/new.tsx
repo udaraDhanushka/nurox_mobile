@@ -10,7 +10,6 @@ import { useMedicalStore } from '../../../store/medicalStore';
 import { useNotificationStore } from '../../../store/notificationStore';
 
 interface SelectedMedicine {
-  medicine: Medicine;
   dosage: string;
   frequency: string;
   duration: string;
@@ -20,7 +19,6 @@ interface SelectedMedicine {
 export default function NewPrescriptionScreen() {
   const router = useRouter();
   const { patientId, patientName } = useLocalSearchParams();
-  const { medicines, searchMedicines } = useMedicineStore();
   const { addPrescription } = useMedicalStore();
   const { addNotification } = useNotificationStore();
   
@@ -29,9 +27,6 @@ export default function NewPrescriptionScreen() {
   const [condition, setCondition] = useState('');
   const [notes, setNotes] = useState('');
   const [selectedMedicines, setSelectedMedicines] = useState<SelectedMedicine[]>([]);
-  const [showMedicineSearch, setShowMedicineSearch] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<Medicine[]>([]);
 
   // Pre-fill patient information if coming from patient detail screen
   useEffect(() => {
@@ -43,18 +38,6 @@ export default function NewPrescriptionScreen() {
     }
   }, [patientName, patientId]);
 
-  const handleMedicineSearch = (query: string) => {
-    setSearchQuery(query);
-    if (query.trim()) {
-      const results = searchMedicines(query);
-      setSearchResults(results);
-    } else {
-      setSearchResults([]);
-    }
-  };
-
-  const addMedicineToSelection = (medicine: Medicine) => {
-    const isAlreadySelected = selectedMedicines.some(selected => selected.medicine.id === medicine.id);
     if (isAlreadySelected) {
       Alert.alert('Medicine Already Added', 'This medicine is already in the prescription.');
       return;
@@ -69,18 +52,6 @@ export default function NewPrescriptionScreen() {
     };
     
     setSelectedMedicines([...selectedMedicines, newSelection]);
-    setShowMedicineSearch(false);
-    setSearchQuery('');
-    setSearchResults([]);
-  };
-
-  const removeMedicineFromSelection = (medicineId: string) => {
-    setSelectedMedicines(selectedMedicines.filter(selected => selected.medicine.id !== medicineId));
-  };
-
-  const updateMedicineDetails = (medicineId: string, field: keyof Omit<SelectedMedicine, 'medicine'>, value: string) => {
-    setSelectedMedicines(selectedMedicines.map(selected => 
-      selected.medicine.id === medicineId 
         ? { ...selected, [field]: value }
         : selected
     ));
@@ -125,7 +96,6 @@ export default function NewPrescriptionScreen() {
       patientId: patientIdInput,
       condition,
       medications: selectedMedicines.map(selected => ({
-        name: selected.medicine.name,
         dosage: selected.dosage,
         frequency: selected.frequency,
         duration: selected.duration,
@@ -220,31 +190,11 @@ export default function NewPrescriptionScreen() {
 
         {/* Medications */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Medications</Text>
-            <TouchableOpacity
-              style={styles.addMedicineButton}
-              onPress={() => setShowMedicineSearch(true)}
-            >
-              <Plus size={20} color={COLORS.white} />
-              <Text style={styles.addMedicineText}>Add Medicine</Text>
-            </TouchableOpacity>
-          </View>
-
-          {selectedMedicines.map((selected, index) => (
-            <View key={selected.medicine.id} style={styles.medicineCard}>
-              <View style={styles.medicineHeader}>
-                <Text style={styles.medicineName}>{selected.medicine.name}</Text>
-                <TouchableOpacity
-                  onPress={() => removeMedicineFromSelection(selected.medicine.id)}
                   style={styles.removeButton}
                 >
                   <X size={20} color={COLORS.error} />
                 </TouchableOpacity>
               </View>
-              
-              <Text style={styles.medicineDescription}>{selected.medicine.description}</Text>
-              
               <View style={styles.medicineDetailsForm}>
                 <View style={styles.inputRow}>
                   <View style={styles.halfInput}>
@@ -252,7 +202,6 @@ export default function NewPrescriptionScreen() {
                     <TextInput
                       style={styles.textInput}
                       value={selected.dosage}
-                      onChangeText={(value) => updateMedicineDetails(selected.medicine.id, 'dosage', value)}
                       placeholder="e.g., 10mg"
                       placeholderTextColor={COLORS.textSecondary}
                     />
@@ -263,7 +212,6 @@ export default function NewPrescriptionScreen() {
                     <TextInput
                       style={styles.textInput}
                       value={selected.frequency}
-                      onChangeText={(value) => updateMedicineDetails(selected.medicine.id, 'frequency', value)}
                       placeholder="e.g., Twice daily"
                       placeholderTextColor={COLORS.textSecondary}
                     />
@@ -275,7 +223,6 @@ export default function NewPrescriptionScreen() {
                   <TextInput
                     style={styles.textInput}
                     value={selected.duration}
-                    onChangeText={(value) => updateMedicineDetails(selected.medicine.id, 'duration', value)}
                     placeholder="e.g., 30 days"
                     placeholderTextColor={COLORS.textSecondary}
                   />
@@ -286,7 +233,6 @@ export default function NewPrescriptionScreen() {
                   <TextInput
                     style={[styles.textInput, styles.textArea]}
                     value={selected.instructions}
-                    onChangeText={(value) => updateMedicineDetails(selected.medicine.id, 'instructions', value)}
                     placeholder="Special instructions for taking this medicine"
                     placeholderTextColor={COLORS.textSecondary}
                     multiline
@@ -318,63 +264,6 @@ export default function NewPrescriptionScreen() {
           style={styles.createButton}
         />
       </ScrollView>
-
-      {/* Medicine Search Modal */}
-      {showMedicineSearch && (
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Medicine</Text>
-              <TouchableOpacity
-                onPress={() => {
-                  setShowMedicineSearch(false);
-                  setSearchQuery('');
-                  setSearchResults([]);
-                }}
-              >
-                <X size={24} color={COLORS.textPrimary} />
-              </TouchableOpacity>
-            </View>
-            
-            <View style={styles.searchContainer}>
-              <Search size={20} color={COLORS.textSecondary} />
-              <TextInput
-                style={styles.searchInput}
-                value={searchQuery}
-                onChangeText={handleMedicineSearch}
-                placeholder="Search medicines..."
-                placeholderTextColor={COLORS.textSecondary}
-                autoFocus
-              />
-            </View>
-            
-            <ScrollView style={styles.searchResults}>
-              {searchResults.map((medicine) => (
-                <TouchableOpacity
-                  key={medicine.id}
-                  style={styles.medicineSearchItem}
-                  onPress={() => addMedicineToSelection(medicine)}
-                >
-                  <Text style={styles.medicineSearchName}>{medicine.name}</Text>
-                  <Text style={styles.medicineSearchDescription}>{medicine.description}</Text>
-                  <Text style={styles.medicineSearchCategory}>{medicine.category}</Text>
-                </TouchableOpacity>
-              ))}
-              
-              <TouchableOpacity
-                style={styles.addNewMedicineButton}
-                onPress={() => {
-                  setShowMedicineSearch(false);
-                  router.push('/(doctor)/medicines/new');
-                }}
-              >
-                <Plus size={20} color={COLORS.primary} />
-                <Text style={styles.addNewMedicineText}>Add New Medicine</Text>
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-        </View>
-      )}
     </SafeAreaView>
   );
 }
@@ -411,12 +300,6 @@ const styles = StyleSheet.create({
   },
   section: {
     marginBottom: 24,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
   },
   sectionTitle: {
     fontSize: SIZES.md,
@@ -500,90 +383,5 @@ const styles = StyleSheet.create({
   },
   createButton: {
     marginBottom: 24,
-  },
-  modalOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalContent: {
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    width: '100%',
-    maxHeight: '80%',
-    ...SHADOWS.large,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  modalTitle: {
-    fontSize: SIZES.lg,
-    fontWeight: '600',
-    color: COLORS.textPrimary,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.background,
-    margin: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    gap: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: SIZES.md,
-    color: COLORS.textPrimary,
-  },
-  searchResults: {
-    flex: 1,
-    paddingHorizontal: 16,
-  },
-  medicineSearchItem: {
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  medicineSearchName: {
-    fontSize: SIZES.md,
-    fontWeight: '600',
-    color: COLORS.textPrimary,
-    marginBottom: 4,
-  },
-  medicineSearchDescription: {
-    fontSize: SIZES.sm,
-    color: COLORS.textSecondary,
-    marginBottom: 4,
-  },
-  medicineSearchCategory: {
-    fontSize: SIZES.xs,
-    color: COLORS.primary,
-    fontWeight: '500',
-  },
-  addNewMedicineButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    gap: 8,
-  },
-  addNewMedicineText: {
-    color: COLORS.primary,
-    fontSize: SIZES.md,
-    fontWeight: '500',
   },
 });

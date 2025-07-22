@@ -1,8 +1,6 @@
 import { appointmentService } from './appointmentService';
 import { Patient, DetailedPatient, ApiAppointment } from '../types/appointment';
 
-class PatientService {
-  // Transform appointment patients to patient list for a specific doctor
   private transformAppointmentPatientsToPatientList(
     appointments: ApiAppointment[],
     doctorId: string
@@ -17,8 +15,6 @@ class PatientService {
         const patientId = apiPatient.id;
         
         if (!patientMap.has(patientId)) {
-          // Calculate age from appointment date (approximate)
-          const age = this.calculateApproximateAge(appointment.appointmentDate);
           
           // Determine patient status based on recent appointment activity
           const status = this.determinePatientStatus(appointment);
@@ -66,13 +62,6 @@ class PatientService {
     return Array.from(patientMap.values())
       .sort((a, b) => new Date(b.lastVisit!).getTime() - new Date(a.lastVisit!).getTime());
   }
-
-  // Calculate approximate age from appointment date (since we don't have birth date)
-  private calculateApproximateAge(appointmentDate: string): number {
-    // This is an approximation - in a real system, you'd get actual birth date
-    // For now, we'll generate a realistic age based on appointment patterns
-    const ages = [25, 28, 32, 35, 42, 45, 58, 62, 35, 28, 40, 33, 29, 38];
-    return ages[Math.floor(Math.random() * ages.length)];
   }
 
   // Determine patient status based on appointment info
@@ -145,7 +134,6 @@ class PatientService {
         return [];
       }
       
-      return this.transformAppointmentPatientsToPatientList(response.appointments, doctorId);
     } catch (error) {
       console.error('Failed to get doctor patients:', error);
       return [];
@@ -199,22 +187,11 @@ class PatientService {
         return null;
       }
       
-      // Get basic patient info from most recent appointment
       const latestAppointment = patientAppointments
         .sort((a, b) => new Date(b.appointmentDate).getTime() - new Date(a.appointmentDate).getTime())[0];
       
       const apiPatient = latestAppointment.patient!;
       
-      // Build detailed patient object
-      const detailedPatient: DetailedPatient = {
-        id: apiPatient.id,
-        firstName: apiPatient.firstName,
-        lastName: apiPatient.lastName,
-        name: `${apiPatient.firstName} ${apiPatient.lastName}`,
-        email: apiPatient.email,
-        phone: apiPatient.phone,
-        profileImage: apiPatient.profileImage || 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?q=80&w=987&auto=format&fit=crop',
-        age: this.calculateApproximateAge(latestAppointment.appointmentDate),
         gender: this.inferGender(apiPatient.firstName),
         lastVisit: latestAppointment.appointmentDate,
         status: this.determinePatientStatus(latestAppointment),

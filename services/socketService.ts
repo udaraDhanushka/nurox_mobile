@@ -1,7 +1,6 @@
 import { io, Socket } from 'socket.io-client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { API_CONFIG } from '../constants/api';
 
 const SOCKET_URL = __DEV__ 
   ? API_CONFIG.DEV_SOCKET_URL  // Development - Use network IP for mobile devices
@@ -32,8 +31,6 @@ class SocketService {
         token = parsed.state?.token;
       }
 
-      // Create socket connection
-      this.socket = io(SOCKET_URL, {
         auth: {
           token,
           userId

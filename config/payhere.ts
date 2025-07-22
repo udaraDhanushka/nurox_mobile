@@ -10,7 +10,6 @@ export const PAYHERE_CONFIG = {
   country: 'LK',
   returnURL: 'nurox://payments/success',
   cancelURL: 'nurox://payments/cancel',
-  notifyURL: 'http://192.168.0.102:3000/api/payments/payhere-webhook', // Updated with actual backend URL
 };
 
 export const getPayHereBaseURL = () => {

@@ -1,71 +1,63 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Image, TextInput } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Image, TextInput, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Search, Filter, FileText, Calendar, User, CheckCircle, Clock } from 'lucide-react-native';
 import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
-
-// Mock prescription data for pharmacists
-const mockPrescriptions = [
-  {
-    id: '1',
-    patientName: 'John Doe',
-    patientImage: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?q=80&w=987&auto=format&fit=crop',
-    medication: 'Lisinopril 10mg',
-    dosage: 'Once daily',
-    quantity: '30 tablets',
-    doctor: 'Dr. Sarah Johnson',
-    dateReceived: '2023-11-15',
-    status: 'pending',
-    priority: 'normal',
-    instructions: 'Take with food'
-  },
-  {
-    id: '2',
-    patientName: 'Emily Johnson',
-    patientImage: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?q=80&w=1961&auto=format&fit=crop',
-    medication: 'Amoxicillin 500mg',
-    dosage: 'Three times daily',
-    quantity: '21 capsules',
-    doctor: 'Dr. Michael Chen',
-    dateReceived: '2023-11-15',
-    status: 'pending',
-    priority: 'urgent',
-    instructions: 'Complete full course'
-  },
-  {
-    id: '3',
-    patientName: 'Michael Smith',
-    patientImage: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=1974&auto=format&fit=crop',
-    medication: 'Ibuprofen 400mg',
-    dosage: 'As needed',
-    quantity: '20 tablets',
-    doctor: 'Dr. Sarah Johnson',
-    dateReceived: '2023-11-14',
-    status: 'completed',
-    priority: 'normal',
-    instructions: 'Take with food, max 3 per day'
-  },
-  {
-    id: '4',
-    patientName: 'Sarah Wilson',
-    patientImage: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?q=80&w=1974&auto=format&fit=crop',
-    medication: 'Albuterol Inhaler',
-    dosage: '2 puffs as needed',
-    quantity: '1 inhaler',
-    doctor: 'Dr. Lisa Brown',
-    dateReceived: '2023-11-13',
-    status: 'ready',
-    priority: 'normal',
-    instructions: 'Shake well before use'
-  }
-];
+import { formatAge } from '../../../utils/dateUtils';
+import { patientDataService } from '../../../services/patientDataService';
+import { prescriptionService } from '../../../services/prescriptionService';
+import { usePatientSyncListener } from '../../../hooks/usePatientSyncListener';
+import { useAuthStore } from '../../../store/authStore';
 
 export default function PharmacistPrescriptionsScreen() {
   const router = useRouter();
+  const { user } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState('');
-  const [filteredPrescriptions, setFilteredPrescriptions] = useState(mockPrescriptions);
+  const [prescriptions, setPrescriptions] = useState([]);
+  const [filteredPrescriptions, setFilteredPrescriptions] = useState([]);
   const [selectedStatus, setSelectedStatus] = useState('all');
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Listen for patient updates across apps
+  const { recentUpdates, refreshPatientData, hasUpdates } = usePatientSyncListener();
+
+  useEffect(() => {
+    loadPrescriptions();
+  }, [user?.id]);
+
+  // Refresh prescription data when patient updates are detected
+  useEffect(() => {
+    if (hasUpdates) {
+      console.log('Patient updates detected in pharmacist app, refreshing data...');
+      // Refresh prescription data to get updated patient information
+      loadPrescriptions();
+    }
+  }, [recentUpdates, hasUpdates]);
+
+  const loadPrescriptions = async () => {
+    if (!user?.id) return;
+    
+    try {
+      setIsLoading(true);
+      setError(null);
+      // Get prescriptions for pharmacists (status: PENDING, PROCESSING, READY)
+      const response = await prescriptionService.getPrescriptions({
+        status: 'PENDING,PROCESSING,READY',
+        limit: 50
+      });
+      setPrescriptions(response.prescriptions);
+      setFilteredPrescriptions(response.prescriptions);
+    } catch (error) {
+      console.error('Failed to load prescriptions:', error);
+      setError('Failed to load prescriptions');
+      setPrescriptions([]);
+      setFilteredPrescriptions([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
@@ -78,18 +70,26 @@ export default function PharmacistPrescriptionsScreen() {
   };
 
   const filterPrescriptions = (query: string, status: string) => {
-    let filtered = mockPrescriptions;
+    let filtered = prescriptions;
 
     if (query.trim() !== '') {
-      filtered = filtered.filter(prescription =>
-        prescription.patientName.toLowerCase().includes(query.toLowerCase()) ||
-        prescription.medication.toLowerCase().includes(query.toLowerCase()) ||
-        prescription.doctor.toLowerCase().includes(query.toLowerCase())
-      );
+      filtered = filtered.filter(prescription => {
+        const patientName = prescription.patient ? 
+          `${prescription.patient.firstName} ${prescription.patient.lastName}` : '';
+        const doctorName = prescription.doctor ? 
+          `${prescription.doctor.firstName} ${prescription.doctor.lastName}` : '';
+        const medicationName = prescription.items?.[0]?.medicine?.name || '';
+        
+        return patientName.toLowerCase().includes(query.toLowerCase()) ||
+               medicationName.toLowerCase().includes(query.toLowerCase()) ||
+               doctorName.toLowerCase().includes(query.toLowerCase());
+      });
     }
 
     if (status !== 'all') {
-      filtered = filtered.filter(prescription => prescription.status === status);
+      filtered = filtered.filter(prescription => 
+        prescription.status?.toLowerCase() === status.toLowerCase()
+      );
     }
 
     setFilteredPrescriptions(filtered);
@@ -110,17 +110,8 @@ export default function PharmacistPrescriptionsScreen() {
     }
   };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'urgent':
-        return COLORS.error;
-      case 'high':
-        return COLORS.warning;
-      case 'normal':
-        return COLORS.success;
-      default:
-        return COLORS.textSecondary;
-    }
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString();
   };
 
   const getStatusIcon = (status: string) => {
@@ -191,84 +182,137 @@ export default function PharmacistPrescriptionsScreen() {
 
       {/* Prescriptions List */}
       <ScrollView style={styles.prescriptionsList} showsVerticalScrollIndicator={false}>
-        {filteredPrescriptions.map((prescription) => (
-          <TouchableOpacity
-            key={prescription.id}
-            style={styles.prescriptionCard}
-            onPress={() => router.push(`/(pharmacist)/prescriptions/${prescription.id}`)}
-          >
-            <View style={styles.prescriptionHeader}>
-              <Image source={{ uri: prescription.patientImage }} style={styles.patientImage} />
-              <View style={styles.prescriptionInfo}>
-                <Text style={styles.patientName}>{prescription.patientName}</Text>
-                <Text style={styles.doctor}>{prescription.doctor}</Text>
-              </View>
-              <View style={styles.statusContainer}>
-                <View style={[
-                  styles.priorityBadge,
-                  { backgroundColor: getPriorityColor(prescription.priority) + '20' }
-                ]}>
-                  <Text style={[
-                    styles.priorityText,
-                    { color: getPriorityColor(prescription.priority) }
-                  ]}>
-                    {prescription.priority}
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
+            <Text style={styles.loadingText}>Loading prescriptions...</Text>
+          </View>
+        ) : error ? (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={loadPrescriptions}>
+              <Text style={styles.retryText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : filteredPrescriptions.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <FileText size={48} color={COLORS.textSecondary} />
+            <Text style={styles.emptyTitle}>No prescriptions found</Text>
+            <Text style={styles.emptyDescription}>
+              {searchQuery ? 'Try adjusting your search criteria' : 'Prescriptions will appear here when patients submit them'}
+            </Text>
+          </View>
+        ) : (
+          filteredPrescriptions.map((prescription) => (
+            <TouchableOpacity
+              key={prescription.id}
+              style={styles.prescriptionCard}
+              onPress={() => router.push(`/(pharmacist)/prescriptions/${prescription.id}`)}
+            >
+              <View style={styles.prescriptionHeader}>
+                <Image 
+                  source={{ 
+                    uri: prescription.patient?.profileImage || 
+                    'https://images.unsplash.com/photo-1599566150163-29194dcaad36?q=80&w=987&auto=format&fit=crop' 
+                  }} 
+                  style={styles.patientImage} 
+                />
+                <View style={styles.prescriptionInfo}>
+                  <Text style={styles.patientName}>
+                    {prescription.patient ? 
+                      `${prescription.patient.firstName} ${prescription.patient.lastName}` : 
+                      'Unknown Patient'
+                    }
+                  </Text>
+                  <Text style={styles.patientAge}>
+                    {(() => {
+                      if (prescription.patient?.dateOfBirth) {
+                        return formatAge(prescription.patient.dateOfBirth);
+                      }
+                      const cachedPatient = patientDataService.getCachedPatientData(prescription.patientId);
+                      return cachedPatient?.dateOfBirth ? formatAge(cachedPatient.dateOfBirth) : 'Age unknown';
+                    })()}
+                  </Text>
+                  <Text style={styles.doctor}>
+                    {prescription.doctor ? 
+                      `Dr. ${prescription.doctor.firstName} ${prescription.doctor.lastName}` : 
+                      'Unknown Doctor'
+                    }
                   </Text>
                 </View>
-                <View style={[
-                  styles.statusBadge,
-                  { backgroundColor: getStatusColor(prescription.status) + '20' }
-                ]}>
-                  {getStatusIcon(prescription.status)}
-                  <Text style={[
-                    styles.statusText,
-                    { color: getStatusColor(prescription.status) }
+                <View style={styles.statusContainer}>
+                  <View style={[
+                    styles.statusBadge,
+                    { backgroundColor: getStatusColor(prescription.status || 'pending') + '20' }
                   ]}>
-                    {prescription.status}
+                    {getStatusIcon(prescription.status || 'pending')}
+                    <Text style={[
+                      styles.statusText,
+                      { color: getStatusColor(prescription.status || 'pending') }
+                    ]}>
+                      {prescription.status || 'pending'}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.medicationInfo}>
+                <View style={styles.medicationHeader}>
+                  <FileText size={20} color={COLORS.primary} />
+                  <Text style={styles.medicationName}>
+                    {prescription.items?.[0]?.medicine?.name || 'Unknown medication'}
+                    {prescription.items && prescription.items.length > 1 && 
+                      ` +${prescription.items.length - 1} more`
+                    }
                   </Text>
-                </View>
-              </View>
-            </View>
-
-            <View style={styles.medicationInfo}>
-              <View style={styles.medicationHeader}>
-                <FileText size={20} color={COLORS.primary} />
-                <Text style={styles.medicationName}>{prescription.medication}</Text>
-              </View>
-              
-              <View style={styles.prescriptionDetails}>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Dosage:</Text>
-                  <Text style={styles.detailValue}>{prescription.dosage}</Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Quantity:</Text>
-                  <Text style={styles.detailValue}>{prescription.quantity}</Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Instructions:</Text>
-                  <Text style={styles.detailValue}>{prescription.instructions}</Text>
-                </View>
-              </View>
-
-              <View style={styles.prescriptionFooter}>
-                <View style={styles.dateContainer}>
-                  <Calendar size={14} color={COLORS.textSecondary} />
-                  <Text style={styles.dateText}>Received: {prescription.dateReceived}</Text>
                 </View>
                 
-                {prescription.status === 'pending' && (
-                  <TouchableOpacity 
-                    style={styles.processButton}
-                    onPress={() => router.push(`/(pharmacist)/prescriptions/${prescription.id}/process`)}
-                  >
-                    <Text style={styles.processButtonText}>Process</Text>
-                  </TouchableOpacity>
-                )}
+                <View style={styles.prescriptionDetails}>
+                  {prescription.items?.[0] && (
+                    <>
+                      <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>Dosage:</Text>
+                        <Text style={styles.detailValue}>
+                          {prescription.items[0].dosage || 'Not specified'}
+                        </Text>
+                      </View>
+                      <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>Quantity:</Text>
+                        <Text style={styles.detailValue}>
+                          {prescription.items[0].quantity || 'Not specified'}
+                        </Text>
+                      </View>
+                      <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>Instructions:</Text>
+                        <Text style={styles.detailValue}>
+                          {prescription.items[0].instructions || prescription.notes || 'No special instructions'}
+                        </Text>
+                      </View>
+                    </>
+                  )}
+                </View>
+
+                <View style={styles.prescriptionFooter}>
+                  <View style={styles.dateContainer}>
+                    <Calendar size={14} color={COLORS.textSecondary} />
+                    <Text style={styles.dateText}>
+                      Created: {prescription.createdAt ? new Date(prescription.createdAt).toLocaleDateString() : 'Unknown'}
+                    </Text>
+                  </View>
+                  
+                  {(prescription.status === 'pending' || prescription.status === 'PENDING') && (
+                    <TouchableOpacity 
+                      style={styles.processButton}
+                      onPress={() => router.push(`/(pharmacist)/prescriptions/${prescription.id}/process`)}
+                    >
+                      <Text style={styles.processButtonText}>Process</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
-            </View>
-          </TouchableOpacity>
-        ))}
+            </TouchableOpacity>
+          ))
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -371,6 +415,12 @@ const styles = StyleSheet.create({
     fontSize: SIZES.md,
     fontWeight: 'bold',
     color: COLORS.textPrimary,
+    marginBottom: 2,
+  },
+  patientAge: {
+    fontSize: SIZES.sm,
+    color: COLORS.primary,
+    fontWeight: '500',
     marginBottom: 4,
   },
   doctor: {
@@ -464,5 +514,60 @@ const styles = StyleSheet.create({
     fontSize: SIZES.xs,
     color: COLORS.white,
     fontWeight: '600',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 48,
+  },
+  loadingText: {
+    fontSize: SIZES.md,
+    color: COLORS.textSecondary,
+    marginTop: 12,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 48,
+    paddingHorizontal: 32,
+  },
+  errorText: {
+    fontSize: SIZES.md,
+    color: COLORS.error,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  retryButton: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  retryText: {
+    fontSize: SIZES.sm,
+    color: COLORS.white,
+    fontWeight: '600',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 48,
+    paddingHorizontal: 32,
+  },
+  emptyTitle: {
+    fontSize: SIZES.lg,
+    fontWeight: 'bold',
+    color: COLORS.textPrimary,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyDescription: {
+    fontSize: SIZES.md,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });

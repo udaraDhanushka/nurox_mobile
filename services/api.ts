@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { API_CONFIG } from '../constants/api';
 
+
 // API Configuration
 const API_BASE_URL = __DEV__ 
   ? API_CONFIG.DEV_BASE_URL  // Development - Use network IP for mobile devices
@@ -17,9 +18,6 @@ interface ApiResponse<T = any> {
 
 class ApiService {
   private baseURL: string;
-
-  constructor() {
-    this.baseURL = API_BASE_URL;
   }
 
   // Get stored auth tokens
@@ -86,7 +84,6 @@ class ApiService {
       }
 
       console.log('Attempting to refresh access token...');
-      const response = await fetch(`${this.baseURL}/auth/refresh-token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -218,7 +215,6 @@ class ApiService {
       //   }
       // }
 
-      const url = `${this.baseURL}${endpoint}`;
       const headers = await this.createHeaders(includeAuth);
 
       const config: RequestInit = {
@@ -410,8 +406,6 @@ class ApiService {
       if (token) {
         headers.Authorization = `Bearer ${token}`;
       }
-
-      const response = await fetch(`${this.baseURL}${endpoint}`, {
         method: 'POST',
         headers,
         body: formData,

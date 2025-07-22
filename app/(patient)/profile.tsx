@@ -9,6 +9,7 @@ import * as ImagePicker from 'expo-image-picker';
 import Constants from 'expo-constants';
 import { LanguageSelector } from '@/components/ui/LanguageSelector';
 import { useTranslation } from '@/hooks/useTranslation';
+import { formatAge } from '@/utils/dateUtils';
 
 export default function ProfileScreen() {
     const router = useRouter();
@@ -168,9 +169,6 @@ export default function ProfileScreen() {
                     </View>
                     <Text style={[styles.name, isDarkMode && styles.textDark]}>{user?.firstName} {user?.lastName}</Text>
                     <Text style={[styles.email, isDarkMode && styles.textSecondaryDark]}>{user?.email}</Text>
-                    <View style={styles.badge}>
-                        <Text style={styles.badgeText}>Patient</Text>
-                    </View>
                 </View>
 
         {/* 2. Dark/Light Toggle */}

@@ -22,12 +22,7 @@ export default function NewLabRequestScreen() {
   const [clinicalNotes, setClinicalNotes] = useState('');
   const [symptoms, setSymptoms] = useState('');
   const [expectedDate, setExpectedDate] = useState('');
-  const [showTestSearch, setShowTestSearch] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  
-  const labTestTemplates = getLabTestTemplates();
-  const [filteredTemplates, setFilteredTemplates] = useState<LabTestTemplate[]>(labTestTemplates);
-  const customTestInputRef = useRef<TextInput>(null);
+
 
   // Pre-fill patient information if coming from patient detail screen
   useEffect(() => {
@@ -39,34 +34,6 @@ export default function NewLabRequestScreen() {
     }
   }, [patientName, patientId]);
 
-  const handleTestSearch = (query: string) => {
-    setSearchQuery(query);
-    if (query.trim()) {
-      const filtered = labTestTemplates.filter(template =>
-        template.name.toLowerCase().includes(query.toLowerCase()) ||
-        template.description.toLowerCase().includes(query.toLowerCase()) ||
-        template.tests.some(test => test.toLowerCase().includes(query.toLowerCase()))
-      );
-      setFilteredTemplates(filtered);
-    } else {
-      setFilteredTemplates(labTestTemplates);
-    }
-  };
-
-  const addTestFromTemplate = (template: LabTestTemplate) => {
-    const newTests = template.tests.filter(test => !selectedTests.includes(test));
-    if (newTests.length === 0) {
-      Alert.alert('Tests Already Added', 'All tests from this template are already selected.');
-      return;
-    }
-
-    setSelectedTests([...selectedTests, ...newTests]);
-    setShowTestSearch(false);
-    setSearchQuery('');
-    setFilteredTemplates(labTestTemplates);
-  };
-
-  const addCustomTest = (testName: string) => {
     if (selectedTests.includes(testName)) {
       Alert.alert('Test Already Added', 'This test is already in the request.');
       return;
@@ -233,16 +200,6 @@ export default function NewLabRequestScreen() {
 
         {/* Lab Tests */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Lab Tests</Text>
-            <TouchableOpacity
-              style={styles.addTestButton}
-              onPress={() => setShowTestSearch(true)}
-            >
-              <Plus size={20} color={COLORS.white} />
-              <Text style={styles.addTestText}>Add Tests</Text>
-            </TouchableOpacity>
-          </View>
 
           {selectedTests.length > 0 ? (
             <View style={styles.selectedTestsContainer}>
@@ -316,86 +273,6 @@ export default function NewLabRequestScreen() {
         />
       </ScrollView>
 
-      {/* Test Search Modal */}
-      {showTestSearch && (
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Lab Tests</Text>
-              <TouchableOpacity
-                onPress={() => {
-                  setShowTestSearch(false);
-                  setSearchQuery('');
-                  setFilteredTemplates(labTestTemplates);
-                }}
-              >
-                <X size={24} color={COLORS.textPrimary} />
-              </TouchableOpacity>
-            </View>
-            
-            <View style={styles.searchContainer}>
-              <Search size={20} color={COLORS.textSecondary} />
-              <TextInput
-                style={styles.searchInput}
-                value={searchQuery}
-                onChangeText={handleTestSearch}
-                placeholder="Search test templates..."
-                placeholderTextColor={COLORS.textSecondary}
-                autoFocus
-              />
-            </View>
-            
-            <ScrollView style={styles.searchResults}>
-              {filteredTemplates.map((template) => (
-                <TouchableOpacity
-                  key={template.id}
-                  style={styles.templateItem}
-                  onPress={() => addTestFromTemplate(template)}
-                >
-                  <View style={styles.templateHeader}>
-                    <Text style={styles.templateName}>{template.name}</Text>
-                    <View style={styles.templateMeta}>
-                      {template.fastingRequired && (
-                        <Text style={styles.fastingText}>Fasting Required</Text>
-                      )}
-                      <Text style={styles.priceText}>${template.price}</Text>
-                    </View>
-                  </View>
-                  <Text style={styles.templateDescription}>{template.description}</Text>
-                  <Text style={styles.templateTests}>
-                    Tests: {template.tests.join(', ')}
-                  </Text>
-                  {template.preparationInstructions && template.preparationInstructions.length > 0 && (
-                    <Text style={styles.preparationText}>
-                      Preparation: {template.preparationInstructions.join(', ')}
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              ))}
-              
-              {/* Custom test input */}
-              <View style={styles.customTestContainer}>
-                <Text style={styles.customTestTitle}>Add Custom Test</Text>
-                <View style={styles.customTestInputContainer}>
-                  <TextInput
-                    ref={customTestInputRef}
-                    style={styles.customTestInput}
-                    placeholder="Enter custom test name"
-                    placeholderTextColor={COLORS.textSecondary}
-                    onSubmitEditing={(event) => {
-                      const testName = event.nativeEvent.text.trim();
-                      if (testName) {
-                        addCustomTest(testName);
-                        customTestInputRef.current?.clear();
-                      }
-                    }}
-                  />
-                </View>
-              </View>
-            </ScrollView>
-          </View>
-        </View>
-      )}
     </SafeAreaView>
   );
 }
@@ -433,12 +310,7 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 24,
   },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
+
   sectionTitle: {
     fontSize: SIZES.md,
     fontWeight: '600',
@@ -494,20 +366,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: COLORS.textPrimary,
   },
-  addTestButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    gap: 6,
-  },
-  addTestText: {
-    color: COLORS.white,
-    fontSize: SIZES.sm,
-    fontWeight: '500',
-  },
+
   selectedTestsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -540,128 +399,5 @@ const styles = StyleSheet.create({
   createButton: {
     marginBottom: 24,
   },
-  modalOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalContent: {
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    width: '100%',
-    maxHeight: '80%',
-    ...SHADOWS.large,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  modalTitle: {
-    fontSize: SIZES.lg,
-    fontWeight: '600',
-    color: COLORS.textPrimary,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.background,
-    margin: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    gap: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: SIZES.md,
-    color: COLORS.textPrimary,
-  },
-  searchResults: {
-    flex: 1,
-    paddingHorizontal: 16,
-  },
-  templateItem: {
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  templateHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  templateName: {
-    fontSize: SIZES.md,
-    fontWeight: '600',
-    color: COLORS.textPrimary,
-    flex: 1,
-  },
-  templateMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  fastingText: {
-    fontSize: SIZES.xs,
-    color: COLORS.warning,
-    fontWeight: '500',
-  },
-  priceText: {
-    fontSize: SIZES.sm,
-    color: COLORS.primary,
-    fontWeight: '600',
-  },
-  templateDescription: {
-    fontSize: SIZES.sm,
-    color: COLORS.textSecondary,
-    marginBottom: 4,
-  },
-  templateTests: {
-    fontSize: SIZES.sm,
-    color: COLORS.textPrimary,
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  preparationText: {
-    fontSize: SIZES.xs,
-    color: COLORS.textSecondary,
-    fontStyle: 'italic',
-  },
-  customTestContainer: {
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    backgroundColor: COLORS.background,
-  },
-  customTestTitle: {
-    fontSize: SIZES.md,
-    fontWeight: '600',
-    color: COLORS.textPrimary,
-    marginBottom: 8,
-  },
-  customTestInputContainer: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  customTestInput: {
-    flex: 1,
-    backgroundColor: COLORS.white,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: SIZES.md,
-    color: COLORS.textPrimary,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
+
 });

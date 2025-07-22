@@ -19,6 +19,7 @@ export default function DoctorPatientDetailScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
+
   const patientId = Array.isArray(id) ? id[0] : id;
   
   useEffect(() => {
@@ -36,7 +37,7 @@ export default function DoctorPatientDetailScreen() {
       
       const patientDetails = await patientService.getPatientById(patientId, user.id);
       if (patientDetails) {
-        setPatient(patientDetails);
+
       } else {
         setError('Patient not found or not associated with your appointments');
       }
@@ -125,7 +126,6 @@ export default function DoctorPatientDetailScreen() {
           <View style={styles.patientInfo}>
             <Text style={styles.patientName}>{patient.name}</Text>
             <Text style={styles.patientDetails}>
-              {patient.age ? `${patient.age} years old` : 'Age unknown'}
               {patient.gender && ` • ${patient.gender}`}
             </Text>
             {patient.phone && <Text style={styles.patientContact}>{patient.phone}</Text>}
@@ -176,11 +176,6 @@ export default function DoctorPatientDetailScreen() {
           <Text style={styles.sectionTitle}>Basic Information</Text>
           <View style={styles.infoCard}>
             {patient.dateOfBirth && (
-              <View style={styles.infoRow}>
-                <User size={16} color={COLORS.textSecondary} />
-                <Text style={styles.infoLabel}>Date of Birth</Text>
-                <Text style={styles.infoValue}>{new Date(patient.dateOfBirth).toLocaleDateString()}</Text>
-              </View>
             )}
             {patient.bloodType && (
               <View style={styles.infoRow}>

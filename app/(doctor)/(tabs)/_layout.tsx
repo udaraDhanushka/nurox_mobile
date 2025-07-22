@@ -1,6 +1,6 @@
 import React from 'react';
 import { Tabs } from 'expo-router/tabs';
-import { Home, Users, Calendar, FileText, User } from 'lucide-react-native';
+import { Home, Users, Calendar, FileText } from 'lucide-react-native';
 import { COLORS } from '@/constants/theme';
 import { TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
